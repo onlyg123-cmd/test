@@ -1,0 +1,1280 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Diffusion 공정·설비 Monitoring</title>
+<style>
+:root{
+  color-scheme:light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10); --border-strong:rgba(11,11,11,.22);
+  --s1:#2a78d6; --s2:#eb6834;
+  --p1:#2a78d6; --p2:#1baf7a; --p3:#6250d6;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --crit-bg:rgba(208,59,59,.08); --warn-bg:rgba(250,178,25,.14); --sel-bg:rgba(42,120,214,.08);
+  --div-neg:#2a78d6; --div-pos:#e34948; --div-mid:#f0efec;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.24);
+    --s1:#3987e5; --s2:#d95926; --p1:#3987e5; --p2:#199e70; --p3:#9085e9;
+    --crit-bg:rgba(208,59,59,.16); --warn-bg:rgba(250,178,25,.12); --sel-bg:rgba(57,135,229,.14);
+    --div-neg:#3987e5; --div-pos:#e66767; --div-mid:#383835;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10); --border-strong:rgba(255,255,255,.24);
+  --s1:#3987e5; --s2:#d95926; --p1:#3987e5; --p2:#199e70; --p3:#9085e9;
+  --crit-bg:rgba(208,59,59,.16); --warn-bg:rgba(250,178,25,.12); --sel-bg:rgba(57,135,229,.14);
+  --div-neg:#3987e5; --div-pos:#e66767; --div-mid:#383835;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+.layout{display:flex;align-items:flex-start;max-width:1900px;margin:0 auto}
+.wrap{flex:1;min-width:0;padding:16px}
+.chat{flex:none;width:400px;position:sticky;top:0;height:100vh;padding:16px 16px 16px 0}
+.layout.nochat .chat{display:none}
+.chatcard{height:100%;display:flex;flex-direction:column;gap:8px;padding:12px}
+.chhd{display:flex;justify-content:space-between;align-items:center}
+.chhd h2{margin:0}
+.cfg{border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:0}
+.cfg label{display:block;font-size:12px;color:var(--ink2);margin-top:6px}
+.cfg input{width:100%;padding:6px 8px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);margin-top:2px}
+.chatlog{flex:1;min-height:120px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:2px}
+.msg{max-width:92%;padding:8px 12px;border-radius:12px;font-size:13.5px;line-height:1.6;word-break:break-word}
+.msg.u{align-self:flex-end;background:var(--s1);color:#fff;border-bottom-right-radius:4px}
+.msg.a{align-self:flex-start;background:var(--sel-bg);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg.err{align-self:flex-start;background:var(--crit-bg);border:1px solid var(--crit)}
+.msg ul{margin:4px 0;padding-left:18px}
+.msg p{margin:4px 0}
+.msg code{background:var(--grid);padding:0 4px;border-radius:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font-size:12px;padding:3px 10px;border-radius:999px;text-align:left}
+.chatin{display:flex;gap:8px;align-items:flex-end}
+.chatin textarea{min-height:44px;max-height:120px}
+.chatin button{white-space:nowrap;min-width:56px;height:44px}
+#chatCtx{max-height:240px;overflow:auto;font-size:11px;white-space:pre-wrap;background:var(--page);border:1px solid var(--border);border-radius:8px;padding:8px;margin:6px 0 0}
+@media (max-width:1320px){
+  .layout{flex-direction:column}
+  .chat{position:static;width:100%;height:680px;padding:0 16px 16px}
+}
+h1{font-size:19px;margin:0}
+h2{font-size:15px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+h3{font-size:13px;margin:0 0 8px;color:var(--ink2)}
+.sub{color:var(--ink2);font-size:12px}
+button,select,textarea,input{font:inherit;color:var(--ink)}
+button,select{background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;padding:6px 10px;cursor:pointer}
+button:hover:not(:disabled){background:var(--sel-bg)}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.btn-primary{background:var(--s1);border-color:var(--s1);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--s1);filter:brightness(1.08)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;min-width:0}
+header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--good)}
+.dot.off{background:var(--muted)}
+.dot.on{animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.banner{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--crit-bg);border:1px solid var(--crit);border-radius:10px;padding:8px 12px;margin-bottom:12px}
+.banner[hidden]{display:none}
+.stats{display:flex;gap:28px;flex-wrap:wrap;padding:10px 16px;margin-bottom:10px;align-items:baseline}
+.stats .it{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.stats b{font-size:20px}
+.eqgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.eqcard{border:1px solid var(--border);border-radius:10px;padding:10px}
+.eqcard.crit{background:linear-gradient(var(--crit-bg),var(--crit-bg)),var(--surface)}
+.eqh{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.chbtn{display:flex;flex-direction:column;gap:2px;text-align:left;width:100%;border-radius:8px;padding:6px 10px;margin-top:6px}
+.chbtn.sel{border-color:var(--s1);box-shadow:0 0 0 1px var(--s1);background:var(--sel-bg)}
+.chbtn .l1{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+.fbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 16px;margin:12px 0}
+.fbar .path{font-weight:700}
+.pp{padding:3px 10px;font-size:13px;border-radius:999px}
+.pp.on{border-color:var(--s1);background:var(--sel-bg);font-weight:700}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px;margin-bottom:12px;align-items:start}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.chh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden}
+.seg button{border:none;border-radius:0;padding:4px 12px;font-size:13px}
+.seg button+button{border-left:1px solid var(--border-strong)}
+.seg button.on{background:var(--sel-bg);font-weight:700;color:var(--s1)}
+.chart{position:relative}
+.chart svg{display:block;width:100%;overflow:visible}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:0 8px;border-radius:999px;border:1px solid var(--border-strong);font-size:12px;white-space:nowrap}
+.chip{display:inline-block;padding:0 6px;border-radius:5px;border:1px solid var(--border-strong);font-size:11px;color:var(--ink2)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}
+th{font-weight:600;color:var(--ink2);font-size:12px}
+th:first-child,td:first-child,td.l,th.l{text-align:left}
+td{font-variant-numeric:tabular-nums}
+.scroll{overflow:auto;max-width:100%}
+.cellf{display:inline-flex;align-items:center;gap:3px;justify-content:flex-end}
+td.crit{font-weight:700;background:var(--crit-bg)}
+td.warn{font-weight:600;background:var(--warn-bg)}
+td.wait{color:var(--muted)}
+.alerts{position:sticky;top:8px;max-height:calc(100vh - 16px);display:flex;flex-direction:column}
+.alist{overflow:auto;display:flex;flex-direction:column;gap:6px;min-height:100px}
+.al{text-align:left;width:100%;display:block;border-radius:10px;padding:8px 10px}
+.al.crit{border-left:4px solid var(--crit)}
+.al.warn{border-left:4px solid var(--warn)}
+.al.done{opacity:.55}
+.al.sel{background:var(--sel-bg);border-color:var(--s1)}
+.al .r1{display:flex;gap:6px;align-items:center}
+.al .r1 b{font-size:13px}
+.filt{font-size:12px;color:var(--ink2)}
+.rca3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,.9fr);gap:24px}
+.lead{margin:0 0 10px;font-size:14px;line-height:1.65}
+.big{display:flex;gap:24px;flex-wrap:wrap;margin:6px 0}
+.big b{display:block;font-size:24px;line-height:1.2}
+.cand{display:block;width:100%;text-align:left;padding:8px 10px;margin-bottom:6px;border-radius:10px}
+.cand.on{border-color:var(--s1);background:var(--sel-bg)}
+.cand .r{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.barbg{display:block;height:6px;border-radius:3px;background:var(--grid);margin:5px 0 3px}
+.bar{display:block;height:6px;border-radius:3px;background:var(--s1)}
+details{margin-top:10px}
+summary{cursor:pointer;color:var(--ink2);font-size:13px}
+ul.ev{margin:6px 0;padding-left:18px;font-size:13px}
+.steps label{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:13.5px;cursor:pointer}
+.steps input{margin-top:4px}
+textarea{width:100%;min-height:50px;background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;padding:6px 8px;resize:vertical}
+.actrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:-4px 0 12px;flex-wrap:wrap}
+.tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:6px 12px}
+.tabs button.on{border-bottom-color:var(--s1);font-weight:700}
+.hm td,.hm th{text-align:center;padding:7px 5px}
+.hm td{min-width:56px;font-weight:600}
+.hm th.l,.hm td.l{text-align:left}
+.hm td[data-ch]{cursor:pointer}
+.hm .selc{box-shadow:inset 0 0 0 2px var(--s1)}
+.finds{display:flex;flex-direction:column;gap:8px}
+.find{border:1px solid var(--border);border-left:4px solid var(--warn);border-radius:10px;padding:8px 12px;font-size:13px}
+.find.crit{border-left-color:var(--crit)}
+.find.ok{border-left-color:var(--good)}
+.find b.t{display:inline-block;margin-right:6px}
+.infgrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:24px}
+.rep{display:grid;grid-template-columns:230px 1fr auto;gap:10px;align-items:center;margin:6px 0;font-size:13px}
+.repbar{display:block;height:12px;border-radius:3px;background:var(--s1)}
+.simgrid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr);gap:28px}
+.sl{display:grid;grid-template-columns:90px 1fr 120px;gap:10px;align-items:center;margin:8px 0;font-size:13px}
+.sl input[type=range]{width:100%;accent-color:var(--s1)}
+.sl .v{text-align:right;font-variant-numeric:tabular-nums}
+.sim2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.mcard{border:1px solid var(--border);border-radius:10px;padding:12px}
+.mcard.crit{border-color:var(--crit);background:var(--crit-bg)}
+.mcard .bv{font-size:26px;font-weight:650;line-height:1.2}
+.cbar{display:inline-block;height:8px;border-radius:2px;vertical-align:middle}
+.toasts{position:fixed;bottom:12px;left:12px;z-index:50;display:flex;flex-direction:column-reverse;gap:8px;width:min(380px,calc(100vw - 24px))}
+.toast{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--border-strong);border-left:5px solid var(--s1);border-radius:10px;padding:10px 12px;box-shadow:0 6px 24px rgba(0,0,0,.22)}
+.toast.crit{border-left-color:var(--crit)}
+.toast.warn{border-left-color:var(--warn)}
+.toast .x{margin-left:auto;padding:0 8px;border:none;font-size:18px;line-height:1.2;background:transparent}
+.toast button{padding:3px 8px;font-size:12px;white-space:nowrap}
+#tip{position:fixed;z-index:60;pointer-events:none;background:var(--ink);color:var(--surface);padding:6px 9px;border-radius:7px;font-size:12px;line-height:1.4;max-width:300px;display:none;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+footer{color:var(--muted);font-size:12px;padding:6px 2px 24px}
+@media (max-width:1180px){
+  .main{grid-template-columns:minmax(0,1fr)}
+  .alerts{position:static;max-height:480px}
+  .rca3,.infgrid,.simgrid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:700px){
+  .wrap{padding:16px}
+  .rep{grid-template-columns:1fr}
+  .sim2{grid-template-columns:minmax(0,1fr)}
+  .sl{grid-template-columns:80px 1fr}
+  .sl .v{grid-column:1/-1;text-align:left}
+}
+</style>
+</head>
+<body>
+<div class="layout" id="layout">
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Diffusion 공정 · 설비 Monitoring</h1>
+      <div class="sub">설비 → 챔버 → PPID별 감시 · 설비 Log(1분 연속 수집) + 공정 계측(Lot·Wafer 단위 수집) · 모든 데이터는 가상 데이터</div>
+    </div>
+    <div class="ctrls">
+      <span class="live"><span class="dot on" id="liveDot"></span><span id="clock">-</span></span>
+      <button id="btnRun">⏸ 일시정지</button>
+      <select id="selSpeed" aria-label="속도"><option value="400">1x</option><option value="200" selected>2x</option><option value="100">4x</option></select>
+      <select id="selScen" aria-label="이상 시나리오"></select>
+      <button id="btnInject">이상 주입</button>
+      <button id="btnChat" aria-label="챗봇 열기/닫기">💬 챗봇</button>
+      <button id="btnTheme" aria-label="테마 전환">🌓</button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" role="alert" hidden></div>
+  <section class="card stats" id="stats" aria-label="핵심 지표"></section>
+  <section class="card" aria-label="설비 챔버 현황">
+    <h2><span>설비 · 챔버 현황</span><span class="sub">챔버를 선택하면 아래 차트가 바뀝니다</span></h2>
+    <div class="eqgrid" id="grid"></div>
+  </section>
+  <section class="card fbar" id="fbar" aria-label="선택 경로 및 PPID 필터"></section>
+
+  <div class="main">
+    <div class="col">
+      <div class="card">
+        <div class="chh"><h2 style="margin:0" id="eqTitle">설비 Log</h2><div class="seg" id="parSeg"></div></div>
+        <div class="sub" id="eqSub" style="margin-bottom:4px"></div>
+        <div class="chart" id="c-eq"></div>
+        <div class="legend" id="legE"></div>
+      </div>
+      <div class="card">
+        <div class="chh"><h2 style="margin:0" id="metTitle">공정 계측</h2><div class="seg" id="metSeg"></div></div>
+        <div class="sub" id="metSub" style="margin-bottom:4px"></div>
+        <div class="chart" id="c-met"></div>
+        <div class="legend" id="legM"></div>
+      </div>
+    </div>
+    <aside class="card alerts" aria-label="알림">
+      <h2><span>🔔 알림</span><span class="filt"><label><input type="checkbox" id="fAll"> 종결 포함</label></span></h2>
+      <div class="alist" id="alerts"></div>
+    </aside>
+  </div>
+
+  <section class="card" id="rca" style="margin-bottom:12px"></section>
+
+  <section class="card" id="infer" style="margin-bottom:12px"></section>
+
+  <section class="card" style="margin-bottom:12px">
+    <div class="tabs" id="tabs" role="tablist">
+      <button data-tab="acts">조치 이력 · 반복 불량</button>
+      <button data-tab="lots">Lot 이력</button>
+      <button data-tab="heat">Parameter 상관</button>
+      <button data-tab="fdc">FDC Spec 제안</button>
+      <button data-tab="pm">PM 이력</button>
+    </div>
+    <div id="tabBody"></div>
+  </section>
+
+  <section class="card" id="sim">
+    <h2><span>🧪 Recipe 시뮬레이션</span><span class="sub">이력 데이터 회귀 모델로 Recipe 변경 시 공정 영향 예측 (What-if)</span></h2>
+    <div class="simgrid">
+      <div id="simCtl"></div>
+      <div id="simOut"></div>
+    </div>
+  </section>
+
+  <footer>
+    감지 규칙 — 설비 Log: 1분 샘플마다 FDC Spec 이탈 / 최근 12샘플 평균 편이(z&gt;4) · 공정 계측: Wafer Spec 이탈 / Lot 평균 3σ 이탈 / 최근 4 Lot 평균 편이(z&gt;3.5). 모든 값은 PPID Setpoint·Target 대비 편차로 감시합니다. 기준 구간은 챔버별 최초 40 Lot. 계측 결과는 공정 종료 후 2 Lot 뒤에 도착합니다(시뮬레이션). 1 Lot = 6분 = 설비 Log 6샘플.
+  </footer>
+</div>
+<aside class="chat" id="chat" aria-label="데이터 챗봇"></aside>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+(function(){
+'use strict';
+/* ====================== 설정 ====================== */
+const BASE_N=40, HIST_N=80, SPL=6, MDELAY=2, WIN=40, EQ_WIN=180, MET_SLOTS=30, BLK=4;
+const PK=['temp','press','flow','lamp'], MK=['thk','xps'];
+const PARAMS={
+  temp :{label:'Zone 온도',unit:'°C',fdc:2.0,dec:2},
+  press:{label:'압력',unit:'mTorr',fdc:12,dec:1},
+  flow :{label:'O₂ 유량',unit:'slm',fdc:0.5,dec:2},
+  lamp :{label:'Lamp Power',unit:'kW',fdc:1.0,dec:2}
+};
+const METS={
+  thk:{label:'Thickness',unit:'Å',tol:3,dec:2,eq:'Ellipsometer'},
+  xps:{label:'도판트 농도(XPS)',unit:'at%',tol:0.25,dec:3,eq:'XPS'}
+};
+const PPIDS={
+  'OXD-900-STD':{sp:{temp:900,press:300,flow:20,lamp:42},tgt:{thk:100,xps:4.5},desc:'Gate Oxide 100Å',col:'--p1'},
+  'OXD-880-THN':{sp:{temp:880,press:300,flow:18,lamp:40},tgt:{thk:80,xps:4.0},desc:'Thin Oxide 80Å',col:'--p2'},
+  'DOP-920-HI' :{sp:{temp:920,press:280,flow:22,lamp:44},tgt:{thk:120,xps:5.2},desc:'High-dose Doping 120Å',col:'--p3'}
+};
+const PP=Object.keys(PPIDS);
+const EQUIP=['DIF-01','DIF-02','DIF-03','DIF-04'], CHN=['A','B'];
+const ITEM={},DEC={};
+MK.forEach(k=>{ITEM[k]=METS[k].label;DEC[k]=METS[k].dec;});
+PK.forEach(k=>{ITEM[k]=PARAMS[k].label;DEC[k]=PARAMS[k].dec;});
+const UNIT=Object.assign({},...MK.map(k=>({[k]:METS[k].unit})),...PK.map(k=>({[k]:PARAMS[k].unit})));
+const SLOTS=[{n:1,thk:-0.25,xps:-0.02},{n:13,thk:0,xps:0},{n:25,thk:0.25,xps:0.02}];
+const PRODUCTS=['LOGIC-A','LOGIC-B','MEM-C'];
+const SCEN={ /* rate: Lot당 변화량 */
+  heater :{name:'DIF-03 CH-A Heater 열화 (온도 Drift) — 챔버 요인',list:[{ch:'DIF-03/A',param:'temp',rate:0.09}]},
+  mfc    :{name:'DIF-02 CH-B O₂ MFC 유량 감소 — 챔버 요인',list:[{ch:'DIF-02/B',param:'flow',rate:-0.07}]},
+  exhaust:{name:'DIF-01 배기 불량 (CH-A·B 압력 상승) — 설비 공통 요인',list:[{ch:'DIF-01/A',param:'press',rate:2.0},{ch:'DIF-01/B',param:'press',rate:2.0}]},
+  hippid :{name:'DIF-04 CH-A 고온 PPID(DOP-920-HI)에서만 온도 미달 — PPID 요인',list:[{ch:'DIF-04/A',param:'temp',rate:-0.12,ppid:'DOP-920-HI'}]},
+  lamp   :{name:'DIF-02 CH-A Lamp Power 열화 — 챔버 요인',list:[{ch:'DIF-02/A',param:'lamp',rate:0.12}]}
+};
+const ACT={
+  temp :{cause:'Heater / Thermocouple 편차',steps:['Control TC ↔ Profile TC 편차 확인','Heater element 저항·전류 점검','온도 Profile 재측정 및 Offset 보정','Test Wafer로 Thickness 확인 후 복귀']},
+  lamp :{cause:'Lamp 열화 / Power 출력 편차',steps:['Lamp Power 출력·전류 Log 확인','Lamp 사용 시간 vs 교체 주기 확인','Power Calibration 재실시','Test Wafer로 Thickness 확인 후 복귀']},
+  flow :{cause:'O₂ MFC 유량 이상',steps:['MFC Zero / Span 교정','Gas line 필터·밸브 Clog 점검','가스 공급 압력 확인','Test Wafer로 Thickness·XPS 확인 후 복귀']},
+  press:{cause:'Leak / 배기 불량',steps:['He Leak Check (Door O-ring, Flange)','Throttle valve · Dry pump 상태 점검','Pressure gauge 교정','Test Wafer로 XPS 확인 후 복귀']}
+};
+const SIMR={temp:[-10,10,0.5],flow:[-3,3,0.1],press:[-60,60,2],lamp:[-3,3,0.1]};
+
+/* ====================== 유틸 ====================== */
+const $=(s,r=document)=>r.querySelector(s);
+const mean=a=>a.reduce((s,v)=>s+v,0)/a.length;
+const sd=a=>{const m=mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/Math.max(1,a.length-1));};
+const fmt=(v,d)=>Number(v).toFixed(d);
+const sgn=(v,d)=>(v>=0?'+':'−')+Math.abs(v).toFixed(d);
+const pad=(n,l=2)=>String(n).padStart(l,'0');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const rnd=mulberry32(20261106);
+function gauss(){let u=0;while(!u)u=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rnd());}
+function pearson(x,y){const n=x.length,mx=mean(x),my=mean(y);let sxy=0,sxx=0,syy=0;for(let i=0;i<n;i++){const a=x[i]-mx,b=y[i]-my;sxy+=a*b;sxx+=a*a;syy+=b*b;}return (sxx&&syy)?sxy/Math.sqrt(sxx*syy):0;}
+function erf(x){const s=Math.sign(x);x=Math.abs(x);const t=1/(1+0.3275911*x);const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;}
+const Phi=z=>0.5*(1+erf(z/Math.SQRT2));
+function ols(X,y){
+  const n=X.length,k=X[0].length+1,A=Array.from({length:k},()=>Array(k+1).fill(0));
+  for(let r=0;r<n;r++){const row=[1,...X[r]];for(let i=0;i<k;i++){for(let j=0;j<k;j++)A[i][j]+=row[i]*row[j];A[i][k]+=row[i]*y[r];}}
+  for(let c=0;c<k;c++){let p=c;for(let r=c+1;r<k;r++)if(Math.abs(A[r][c])>Math.abs(A[p][c]))p=r;[A[c],A[p]]=[A[p],A[c]];
+    if(Math.abs(A[c][c])<1e-12)return null;
+    for(let r=0;r<k;r++){if(r===c)continue;const f=A[r][c]/A[c][c];for(let j=c;j<=k;j++)A[r][j]-=f*A[c][j];}}
+  return A.map((row,i)=>row[k]/row[i]);
+}
+const pfmt=p=>p<0.001?'<0.001':p.toFixed(3);
+const T0=Date.now()-HIST_N*SPL*60000;
+const kTime=k=>T0+k*60000;
+const hhmm=t=>{const d=new Date(t);return pad(d.getHours())+':'+pad(d.getMinutes());};
+const mdhm=t=>{const d=new Date(t);return pad(d.getMonth()+1)+'/'+pad(d.getDate())+' '+hhmm(t);};
+const lotEndK=i=>(i+1)*SPL-1;
+const sw=q=>`<i class="sw" style="background:var(${PPIDS[q].col})"></i>`;
+
+/* ====================== 상태 ====================== */
+const S={chs:[],alerts:[],alertSeq:0,actions:[],pm:[],faultLog:[],sel:'DIF-03/A',ppf:'all',selAlert:null,parSel:'temp',metSel:'thk',tab:'acts',
+  running:true,speed:200,tick:0,ui:{},showAll:false,hover:false,dirty:false,sigAlerts:'',actSeq:0,detOpen:false,
+  sim:{d:{temp:0,flow:0,press:0,lamp:0},cur:true,couple:true,sweep:'temp',met:'thk',ch:'DIF-03/A',pp:'OXD-900-STD'}};
+const ch=id=>S.chs.find(c=>c.id===id);
+const curCh=()=>ch(S.sel);
+const nowK=()=>{const s=S.chs[0].samples;return s[s.length-1].k;};
+function makeSched(){const a=[];let prev=-1;for(let i=0;i<80;i++){let q;do{const r=rnd();q=r<0.5?0:r<0.75?1:2;}while(q===prev);a.push(PP[q]);prev=q;}return a;}
+const ppidOf=(C,li)=>C.sched[Math.floor(li/BLK)%C.sched.length];
+const tg=(m,q)=>PPIDS[q].tgt[m];
+EQUIP.forEach(e=>CHN.forEach(c=>S.chs.push({id:`${e}/${c}`,eq:e,ch:c,label:`${e} CH-${c}`,samples:[],lots:[],faults:[],resetK:0,resetLot:0,base:null,nextK:0,sched:makeSched(),
+  bias:{thk:0.3*gauss(),xps:0.02*gauss()},noise:{thk:0.42+0.06*rnd(),xps:0.048+0.006*rnd()}})));
+
+S.pm.push(
+  {ch:'DIF-01/A',lot:18,type:'PM',param:null,title:'Quartz tube 세정',detail:'정기 PM (500 Lot 주기)'},
+  {ch:'DIF-02/B',lot:33,type:'PM',param:'flow',title:'O₂ MFC Zero/Span 교정',detail:'정기 교정, 편차 0.1% 이내'},
+  {ch:'DIF-03/A',lot:52,type:'PM',param:'temp',title:'Zone-C Heater element 교체',detail:'PM 후 온도 Profile 미재측정 (Shift 일보)'},
+  {ch:'DIF-03/A',lot:25,type:'Shift',param:null,title:'Boat 교체',detail:'Boat 마모로 신품 교체'},
+  {ch:'DIF-04/A',lot:30,type:'PM',param:'temp',title:'Zone Heater 저항 점검',detail:'고온 구간 출력 여유 낮음 메모'},
+  {ch:'DIF-04/B',lot:9,type:'PM',param:'press',title:'Dry pump 오일 교환',detail:'정기 PM'},
+  {ch:'DIF-01/B',lot:62,type:'Shift',param:null,title:'Door O-ring 육안 점검',detail:'이상 없음 (육안)'}
+);
+[['10/08','DIF-03/A','temp',14],['10/21','DIF-03/A','temp',11],['11/02','DIF-03/A','temp',9],
+ ['10/12','DIF-02/B','flow',8],['10/29','DIF-02/B','flow',12],
+ ['10/15','DIF-01/A','press',6],['11/01','DIF-01/B','press',7],['10/25','DIF-04/A','temp',5]]
+.forEach(([d,c,p,l])=>S.actions.push({id:++S.actSeq,time:d,ch:c,param:p,label:ACT[p].cause,action:ACT[p].steps.slice(0,2).join(' / '),lots:l,verdict:'recovered'}));
+
+/* ====================== 데이터 생성 ====================== */
+function injectFault(key,atK){
+  const sc=SCEN[key],ids=[];
+  sc.list.forEach(f=>{ch(f.ch).faults.push({key,param:f.param,rate:f.rate/SPL,ppid:f.ppid||null,start:atK});ids.push(f.ch);});
+  S.faultLog.push({chs:ids,start:atK,det:null,detMet:null});
+}
+function genSample(C){
+  const k=C.nextK++,li=Math.floor(k/SPL),q=ppidOf(C,li),sp=PPIDS[q].sp;
+  const off={temp:0,press:0,flow:0,lamp:0};
+  C.faults.forEach(f=>{if(k>=f.start&&(!f.ppid||f.ppid===q))off[f.param]+=f.rate*(k-f.start+1);});
+  const lamp=sp.lamp+off.lamp+0.25*gauss();
+  const v={lamp,temp:sp.temp+0.6*(lamp-sp.lamp)+off.temp+0.30*gauss(),press:sp.press+off.press+3*gauss(),flow:sp.flow+off.flow+0.12*gauss()};
+  const d={},fl={};
+  PK.forEach(p=>{d[p]=v[p]-sp[p];fl[p]=(C.base&&Math.abs(d[p])>PARAMS[p].fdc)?'crit':'ok';});
+  const s={k,t:kTime(k),q,li,v,d,fl};
+  C.samples.push(s);return s;
+}
+function closeLot(C){
+  const i=C.lots.length,sm=C.samples.slice(-SPL),q=sm[0].q;
+  const par={},pd={};PK.forEach(p=>{par[p]=mean(sm.map(s=>s.v[p]));pd[p]=mean(sm.map(s=>s.d[p]));});
+  const dT=1.2*pd.temp+2.0*pd.flow-0.02*pd.press+C.bias.thk+C.noise.thk*gauss();
+  const dX=0.04*pd.temp+0.15*pd.flow+0.006*pd.press+C.bias.xps+C.noise.xps*gauss();
+  const wf=SLOTS.map(sl=>({slot:sl.n,thk:tg('thk',q)+dT+sl.thk+0.12*gauss(),xps:tg('xps',q)+dX+sl.xps+0.02*gauss()}));
+  const met={thk:mean(wf.map(w=>w.thk)),xps:mean(wf.map(w=>w.xps))};
+  const lot={i,id:'L2611'+C.eq.slice(-1)+C.ch+pad(i+1,3),q,prod:PRODUCTS[Math.floor(rnd()*3)],kEnd:sm[SPL-1].k,t:sm[SPL-1].t,par,pd,wf,met,
+    md:{thk:met.thk-tg('thk',q),xps:met.xps-tg('xps',q)},fl:{thk:'ok',xps:'ok'},measured:false};
+  C.lots.push(lot);
+  if(C.lots.length===BASE_N){
+    C.base={};
+    PK.forEach(p=>{const a=C.samples.map(s=>s.d[p]);C.base[p]={mu:mean(a),sd:sd(a)};});
+    MK.forEach(m=>{const a=C.lots.map(l=>l.md[m]);C.base[m]={mu:mean(a),sd:sd(a)};});
+  }
+}
+function measureStep(C,live,k){
+  C.lots.forEach(l=>{
+    if(l.measured||C.lots.length-1-l.i<MDELAY)return;
+    l.measured=true;
+    if(!C.base||l.i<BASE_N)return;
+    MK.forEach(m=>{const tol=METS[m].tol,b=C.base[m];l.fl[m]=l.wf.some(w=>Math.abs(w[m]-tg(m,l.q))>tol)?'crit':Math.abs(l.md[m]-b.mu)>3*b.sd?'warn':'ok';});
+    detectMet(C,l,live,k);
+  });
+}
+function step(C,live){
+  const s=genSample(C);
+  if(C.base&&s.k>=BASE_N*SPL)detectEQ(C,s,live);
+  if((s.k+1)%SPL===0){closeLot(C);measureStep(C,live,s.k);verify(C);}
+  if(C.samples.length>3000)C.samples.splice(0,500);
+}
+
+/* ====================== 이상 감지 ====================== */
+function detectEQ(C,s,live){
+  const k=s.k,found=[],can=(k-11)>=C.resetK&&C.samples.length>=12;
+  PK.forEach(p=>{
+    const P=PARAMS[p],b=C.base[p],dv=s.d[p];
+    if(Math.abs(dv)>P.fdc)found.push({src:'eq',item:p,sev:'crit',type:'FDC Spec Out',msg:`${s.q} · Setpoint 대비 ${sgn(dv,P.dec)} ${P.unit} (Spec ±${P.fdc})`});
+    if(can){
+      const m=mean(C.samples.slice(-12).map(x=>x.d[p])),z=(m-b.mu)/(b.sd/Math.sqrt(12));
+      if(Math.abs(z)>4)found.push({src:'eq',item:p,sev:'warn',type:'FDC Shift',msg:`최근 12분 평균 Setpoint 대비 ${sgn(m,P.dec)} ${P.unit}`});
+    }
+  });
+  found.sort((a,b)=>(a.sev==='crit'?0:1)-(b.sev==='crit'?0:1));
+  found.forEach(f=>upsert(C,f,k,live));
+  S.alerts.forEach(a=>{if(a.ch===C.id&&a.status==='active'&&k-a.last>=60)a.status='cleared';});
+}
+function detectMet(C,lot,live,k){
+  const found=[];
+  MK.forEach(m=>{
+    const M=METS[m],b=C.base[m],t=tg(m,lot.q);
+    const bad=lot.wf.find(w=>Math.abs(w[m]-t)>M.tol);
+    if(bad)found.push({src:'met',item:m,sev:'crit',type:'SPEC OUT',msg:`${lot.id} (${lot.q}) W${pad(bad.slot)} Target 대비 ${sgn(bad[m]-t,M.dec)} ${M.unit} (Spec ±${M.tol})`});
+    else if(Math.abs(lot.md[m]-b.mu)>3*b.sd)found.push({src:'met',item:m,sev:'warn',type:'OOC (3σ 이탈)',msg:`${lot.id} (${lot.q}) Lot 평균 Target 대비 ${sgn(lot.md[m],M.dec)} ${M.unit}`});
+    const w4=C.lots.filter(l=>l.measured&&l.i>=Math.max(C.resetLot,BASE_N)).slice(-4);
+    if(w4.length===4){
+      const m4=mean(w4.map(l=>l.md[m])),z=(m4-b.mu)/(b.sd/2);
+      if(Math.abs(z)>3.5)found.push({src:'met',item:m,sev:'warn',type:'Shift (평균 편이)',msg:`최근 4 Lot 평균 Target 대비 ${sgn(m4,M.dec)} ${M.unit}`});
+    }
+  });
+  found.sort((a,b)=>(a.sev==='crit'?0:1)-(b.sev==='crit'?0:1));
+  found.forEach(f=>{f.li=lot.i;upsert(C,f,k,live);});
+}
+function upsert(C,f,k,live){
+  const key=C.id+':'+f.item;
+  let a=S.alerts.find(x=>x.key===key&&x.status==='active');
+  if(!a){
+    a={id:++S.alertSeq,key,ch:C.id,src:f.src,item:f.item,sev:f.sev,type:f.type,msg:f.msg,k0:k,last:k,count:1,status:'active',li:f.li};
+    S.alerts.push(a);
+    const fl=S.faultLog.find(x=>x.chs.includes(C.id)&&k>=x.start&&(f.src==='eq'?x.det===null:x.detMet===null));
+    if(fl){if(f.src==='eq')fl.det=k;else fl.detMet=k;}
+    if(live)notify(a);
+  }else{
+    a.last=k;a.count++;
+    if(f.sev==='crit'&&a.sev!=='crit'){a.sev='crit';a.type=f.type;a.msg=f.msg;if(f.li!=null)a.li=f.li;if(live)notify(a);}
+    else if(f.sev===a.sev&&f.type===a.type)a.msg=f.msg;
+  }
+}
+function onsetSample(C,p){
+  const b=C.base[p],lim=b.sd/Math.sqrt(12),sm=C.samples,pre=[0];
+  sm.forEach(s=>pre.push(pre[pre.length-1]+s.d[p]));
+  let k=sm.length-1;
+  for(;k>=11;k--){if(Math.abs((pre[k+1]-pre[k-11])/12-b.mu)<=lim)break;}
+  return sm[Math.max(k-6,0)].k;
+}
+function onsetLot(C,m){
+  const ML=C.lots.filter(l=>l.measured),b=C.base[m],lim=b.sd/Math.sqrt(3);
+  let j=ML.length-1;
+  for(;j>=2;j--){if(Math.abs((ML[j].md[m]+ML[j-1].md[m]+ML[j-2].md[m])/3-b.mu)<=lim)break;}
+  return ML[Math.max(j-1,0)].i;
+}
+let slopeCache={key:'',v:null};
+function getSlopes(){
+  const key=S.chs.map(c=>c.lots.length).join();
+  if(slopeCache.key===key)return slopeCache.v;
+  const ML=S.chs.flatMap(c=>c.lots.filter(l=>l.measured)),v={};
+  PK.forEach(p=>{v[p]={};const x=ML.map(l=>l.pd[p]);MK.forEach(m=>{const y=ML.map(l=>l.md[m]);v[p][m]=pearson(x,y)*sd(y)/sd(x);});});
+  slopeCache={key,v};return v;
+}
+let simCache={key:'',v:null};
+function simModel(){
+  const key=S.chs.map(c=>c.lots.length).join();
+  if(simCache.key===key)return simCache.v;
+  const rows=S.chs.flatMap(c=>c.lots.filter(l=>l.measured&&l.i>=BASE_N));
+  const X=rows.map(l=>PK.map(p=>l.pd[p])),beta={},rs={};
+  MK.forEach(m=>{const y=rows.map(l=>l.md[m]),b=ols(X,y);let sse=0;X.forEach((r,i)=>{const e=y[i]-(b[0]+r.reduce((s,v,j)=>s+v*b[j+1],0));sse+=e*e;});beta[m]=b;rs[m]=Math.sqrt(sse/Math.max(1,rows.length-5));});
+  const tp=rows.map(l=>l.pd.temp),lp=rows.map(l=>l.pd.lamp);
+  const v={beta,rs,couple:pearson(lp,tp)*sd(tp)/sd(lp),n:rows.length};
+  simCache={key,v};return v;
+}
+
+/* ====================== 연관관계 추정 (설비·챔버·PPID) ====================== */
+function comboStat(C,q,m){
+  const L=C.lots.filter(l=>l.measured&&l.q===q&&l.i>=Math.max(C.resetLot,BASE_N)).slice(-6);
+  if(L.length<3)return null;
+  const mu=mean(L.map(l=>l.md[m])),z=(mu-C.base[m].mu)/(C.base[m].sd/Math.sqrt(L.length));
+  return {n:L.length,mu,z,flag:Math.abs(z)>3.5,lots:L};
+}
+function paramEvidence(C,q){
+  let best=null;
+  PK.forEach(p=>{
+    let z,delta;
+    if(q){const L=C.lots.filter(l=>l.q===q).slice(-6);if(L.length<2)return;delta=mean(L.map(l=>l.pd[p]))-C.base[p].mu;z=delta/(C.base[p].sd/Math.sqrt(SPL*L.length));}
+    else{const sm=C.samples.slice(-12);delta=mean(sm.map(s=>s.d[p]))-C.base[p].mu;z=delta/(C.base[p].sd/Math.sqrt(12));}
+    if(Math.abs(z)>=3&&(!best||Math.abs(z)>Math.abs(best.z)))best={p,z,delta};
+  });
+  return best;
+}
+let infCache={key:'',v:null};
+function inferAll(m){
+  const key=m+'|'+S.chs.map(c=>c.lots.length+':'+c.resetLot).join();
+  if(infCache.key===key)return infCache.v;
+  const cell={};
+  S.chs.forEach(C=>PP.forEach(q=>{cell[C.id+'|'+q]=comboStat(C,q,m);}));
+  const finds=[],used=new Set();
+  const lbl=C=>C.label,pe=(C,q)=>{const e=paramEvidence(C,q);return e?` 설비 Log에서도 <b>${PARAMS[e.p].label} ${sgn(e.delta,PARAMS[e.p].dec)} ${PARAMS[e.p].unit}</b> 변동이 관측됩니다.`:'';};
+  const flagged=(C)=>PP.filter(q=>cell[C.id+'|'+q]&&cell[C.id+'|'+q].flag);
+  const withData=C=>PP.filter(q=>cell[C.id+'|'+q]);
+  /* 1) 설비 공통: 같은 설비의 두 챔버가 모두 다수 PPID에서 이상 */
+  EQUIP.forEach(e=>{
+    const cs=S.chs.filter(c=>c.eq===e);
+    if(cs.every(c=>flagged(c).length>=1&&flagged(c).length>=Math.min(2,withData(c).length))){
+      cs.forEach(c=>used.add(c.id));
+      const ev=cs.map(c=>paramEvidence(c,null)).filter(Boolean),common=ev.length===cs.length&&ev.every(x=>x.p===ev[0].p)?ev[0]:null;
+      finds.push({type:'설비 공통 요인',sev:'crit',chs:cs.map(c=>c.id),text:`<b>${e}</b>의 CH-A·CH-B가 함께 이상입니다. 챔버 하나가 아니라 설비 단위 요인(배기·가스 공급·전원 등)이 의심됩니다.${common?` 두 챔버 모두 <b>${PARAMS[common.p].label}</b>이(가) 같은 방향으로 변했습니다(${sgn(common.delta,PARAMS[common.p].dec)} ${PARAMS[common.p].unit}).`:''}`});
+    }
+  });
+  /* 2) 챔버 요인: 한 챔버에서 여러 PPID 이상 (형제 챔버는 정상) */
+  S.chs.forEach(C=>{
+    if(used.has(C.id))return;
+    const f=flagged(C);
+    if(f.length>=2||(f.length===1&&withData(C).length===1)){
+      used.add(C.id);
+      finds.push({type:'챔버 요인',sev:'crit',chs:[C.id],text:`<b>${lbl(C)}</b>: ${f.length}개 PPID(${f.join(', ')})에서 모두 편차가 나타납니다. 같은 설비의 다른 챔버와 다른 설비는 정상이므로 해당 챔버 고유 요인입니다.${pe(C,null)}`});
+    }
+  });
+  /* 3) PPID 요인: 한 챔버에서 특정 PPID만 이상 / 여러 설비에서 같은 PPID 이상 */
+  PP.forEach(q=>{
+    const bad=S.chs.filter(C=>!used.has(C.id)&&cell[C.id+'|'+q]&&cell[C.id+'|'+q].flag);
+    const eqs=new Set(bad.map(c=>c.eq));
+    if(bad.length>=2&&eqs.size>=2){
+      bad.forEach(c=>used.add(c.id));
+      finds.push({type:'PPID(Recipe) 요인',sev:'warn',chs:bad.map(c=>c.id),text:`<b>${q}</b>가 서로 다른 설비(${bad.map(c=>c.label).join(', ')})에서 동시에 이상입니다. 설비보다 Recipe 설정·계측 Spec 등 PPID 자체를 먼저 점검하세요.`});
+    }else bad.forEach(C=>{
+      const others=withData(C).filter(x=>x!==q);
+      if(others.length&&others.every(x=>!cell[C.id+'|'+x].flag)){
+        used.add(C.id);
+        finds.push({type:'PPID(Recipe) 요인',sev:'warn',chs:[C.id],text:`<b>${C.label}</b>: <b>${q}</b>에서만 이상이고 같은 챔버의 ${others.join(', ')}는 정상입니다. 특정 Recipe 조건(${PPIDS[q].desc})에서만 나타나는 한계로 보입니다.${pe(C,q)}`});
+      }else{
+        used.add(C.id);
+        finds.push({type:'챔버 × PPID 국소',sev:'warn',chs:[C.id],text:`<b>${C.label}</b> · <b>${q}</b>에서 이상이 관측됩니다.${pe(C,q)}`});
+      }
+    });
+  });
+  const v={cell,finds};infCache={key,v};return v;
+}
+
+/* ====================== 원인 분석 ====================== */
+function analyze(a){
+  const C=ch(a.ch),ML=C.lots.filter(l=>l.measured),W=Math.min(WIN,ML.length),lots=ML.slice(-W),sl=getSlopes();
+  const cur={},delta={},z={},last12=C.samples.slice(-12);
+  PK.forEach(p=>{cur[p]=mean(last12.map(s=>s.d[p]));delta[p]=cur[p]-C.base[p].mu;z[p]=delta[p]/(C.base[p].sd/Math.sqrt(12));});
+  let mk;
+  if(a.src==='met')mk=a.item;
+  else mk=MK.reduce((best,m)=>Math.abs(sl[a.item][m]*PARAMS[a.item].fdc)/METS[m].tol>Math.abs(sl[a.item][best]*PARAMS[a.item].fdc)/METS[best].tol?m:best,'thk');
+  const M=METS[mk],bm=C.base[mk],w4=ML.slice(-4),m4=mean(w4.map(l=>l.md[mk])),zM=(m4-bm.mu)/(bm.sd/Math.sqrt(w4.length));
+  const onM=onsetLot(C,mk);
+  const cands=PK.map(p=>{
+    const r=pearson(lots.map(l=>l.pd[p]),lots.map(l=>l.md[mk])),t=r*Math.sqrt((W-2)/Math.max(1e-9,1-r*r)),pv=2*(1-Phi(Math.abs(t)));
+    const on=Math.abs(z[p])>=3?onsetSample(C,p):null;
+    return {p,r,pv,z:z[p],delta:delta[p],on,effect:sl[p][mk]*delta[p],pm:null,score:0};
+  });
+  const ons=cands.filter(c=>c.on!=null).map(c=>c.on),minOn=ons.length?Math.min(...ons):null;
+  cands.forEach(c=>{
+    const early=c.on==null?0:Math.max(0,1-0.25*((c.on-minOn)/SPL));
+    let s=0.40*Math.min(Math.abs(c.effect)/M.tol,1)+0.30*Math.min(Math.abs(c.z)/10,1)+0.20*early+0.10*Math.abs(c.r);
+    if(c.on==null)s*=0.3;
+    const ref=c.on!=null?Math.floor(c.on/SPL):onM;
+    const pm=S.pm.filter(e=>e.ch===C.id&&e.param===c.p&&e.type==='PM'&&e.lot<=ref+2&&e.lot>=ref-12).sort((x,y)=>y.lot-x.lot)[0];
+    if(pm){c.pm=pm;s+=0.10;}
+    c.score=Math.min(s,1);
+  });
+  cands.sort((x,y)=>y.score-x.score);
+  const q=ppidOf(C,C.lots.length),tgt=tg(mk,q);
+  let pred=null,rs=null,pOut=null;
+  const fit=ML.slice(-60),X=fit.map(l=>PK.map(p=>l.pd[p])),y=fit.map(l=>l.md[mk]),beta=ols(X,y);
+  if(beta){
+    const dev=beta[0]+PK.reduce((s,p,i)=>s+cur[p]*beta[i+1],0);
+    pred=tgt+dev;
+    let sse=0;X.forEach((row,r)=>{const e=y[r]-(beta[0]+row.reduce((s,v,i)=>s+v*beta[i+1],0));sse+=e*e;});
+    rs=Math.sqrt(sse/Math.max(1,fit.length-PK.length-1));
+    pOut=(1-Phi((M.tol-dev)/rs))+Phi((-M.tol-dev)/rs);
+  }
+  const L6=ML.slice(-6),xs=L6.map((_,i)=>i),ys=L6.map(l=>l.md[mk]);
+  const slope=pearson(xs,ys)*sd(ys)/sd(xs);
+  let eta=null;const c3=mean(ML.slice(-3).map(l=>l.md[mk]));
+  if(Math.abs(slope)>1e-9){const lim=slope>0?M.tol:-M.tol;eta=Math.max(0,(lim-c3)/slope);if(eta>200)eta=null;}
+  const top=cands[0];
+  const onLot=a.src==='eq'?Math.floor(onsetSample(C,a.item)/SPL):(top.on!=null?Math.floor(top.on/SPL):onM);
+  const affected=C.lots.length-onLot+1;
+  const soLots=ML.filter(l=>l.i>=onLot&&l.fl[mk]==='crit').length;
+  const byPp=PP.map(qq=>{const s=comboStat(C,qq,mk);return {q:qq,s};});
+  return {mk,M,m4,zM,onM,onLot,cands,pred,rs,pOut,slope,eta,affected,soLots,W,bm,cur,delta,z,q,tgt,byPp};
+}
+
+/* ====================== 알림 / 조치 ====================== */
+function icon(sev){
+  if(sev==='crit')return '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="var(--crit)"/><path d="M5.2 5.2l5.6 5.6M10.8 5.2l-5.6 5.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  if(sev==='warn')return '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.5L15 14H1z" fill="var(--warn)"/><path d="M8 6v4" stroke="#0b0b0b" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="11.8" r="1" fill="#0b0b0b"/></svg>';
+  return '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="var(--good)"/><path d="M4.6 8.2l2.4 2.4 4.4-4.8" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+const SEVTXT={crit:'위험',warn:'경고',ok:'정상'};
+const badge=(sev,txt)=>`<span class="badge">${icon(sev)}${txt||SEVTXT[sev]}</span>`;
+function notify(a){toast({sev:a.sev,title:`[${ch(a.ch).label}] ${ITEM[a.item]} — ${a.type}`,body:a.msg,alertId:a.id,sticky:a.sev==='crit'});}
+function toast(o){
+  const d=document.createElement('div');d.className='toast '+(o.sev||'info');
+  d.innerHTML=`${o.sev?icon(o.sev):''}<div><b>${esc(o.title)}</b><div class="sub">${esc(o.body||'')}</div></div>${o.alertId?`<button data-act="viewAlert" data-id="${o.alertId}">분석 보기</button>`:''}<button class="x" data-act="closeToast" aria-label="닫기">×</button>`;
+  const host=$('#toasts');host.prepend(d);
+  while(host.children.length>4)host.lastChild.remove();
+  if(!o.sticky)setTimeout(()=>d.remove(),9000);
+}
+function uiOf(a,an){return S.ui[a.id]||(S.ui[a.id]={cause:an.cands[0].p,checked:{},memo:''});}
+function approve(a){
+  const an=analyze(a),u=uiOf(a,an),C=ch(a.ch);
+  const steps=ACT[u.cause].steps.filter((s,i)=>u.checked[i]);
+  if(!steps.length)return;
+  C.faults=C.faults.filter(f=>f.param!==u.cause);
+  S.alerts.forEach(x=>{if(x.ch===a.ch&&x.status==='active')x.status='closed';});
+  C.resetK=C.nextK;C.resetLot=C.lots.length;
+  S.actions.push({id:++S.actSeq,time:mdhm(kTime(nowK())),ch:C.id,param:u.cause,label:ACT[u.cause].cause,action:steps.join(' / '),memo:u.memo,lots:an.affected,verdict:'pending',fixLot:C.lots.length});
+  S.pm.push({ch:C.id,lot:C.lots.length,type:'조치',param:u.cause,title:'조치: '+ACT[u.cause].cause,detail:steps.length+'개 항목 수행 · 엔지니어 승인'});
+  toast({sev:'ok',title:`[${C.label}] 조치 승인 · 알림 종결`,body:'조치 후 3 Lot 계측 결과로 복귀 여부를 자동 검증합니다.'});
+  pickNext();renderAll(true);
+}
+function falseAlarm(a){
+  a.status='fp';
+  S.actions.push({id:++S.actSeq,time:mdhm(kTime(nowK())),ch:a.ch,param:null,label:'오탐 (Limit 조정 후보)',action:`${ITEM[a.item]} ${a.type}`,lots:0,verdict:'fp'});
+  pickNext();renderAll(true);
+}
+function pickNext(){
+  const act=S.alerts.filter(x=>x.status==='active').sort((x,y)=>(x.sev==='crit'?0:1)-(y.sev==='crit'?0:1)||y.last-x.last);
+  if(act.length)S.selAlert=act[0].id;
+}
+function verify(C){
+  S.actions.forEach(ac=>{
+    if(ac.ch!==C.id||ac.verdict!=='pending')return;
+    const post=C.lots.filter(l=>l.measured&&l.i>=ac.fixLot);
+    if(post.length<3)return;
+    let bad=false;
+    MK.forEach(m=>{const b=C.base[m],zz=(mean(post.map(l=>l.md[m]))-b.mu)/(b.sd/Math.sqrt(post.length));if(Math.abs(zz)>3.5||post.some(l=>l.fl[m]==='crit'))bad=true;});
+    const l12=C.samples.slice(-12);
+    PK.forEach(p=>{const b=C.base[p],zz=(mean(l12.map(s=>s.d[p]))-b.mu)/(b.sd/Math.sqrt(12));if(Math.abs(zz)>4)bad=true;});
+    ac.verdict=bad?'unresolved':'recovered';
+    toast({sev:bad?'crit':'ok',title:`[${C.label}] 조치 결과: ${bad?'미해결 — 원인 재검토 필요':'정상 복귀 확인'}`,body:ac.label});
+  });
+}
+
+/* ====================== 차트 ====================== */
+const tip=$('#tip');
+function showTip(html,x,y){tip.innerHTML=html;tip.style.display='block';const w=tip.offsetWidth,h=tip.offsetHeight;let l=x+14,t=y+14;if(l+w>innerWidth-6)l=x-w-14;if(t+h>innerHeight-6)t=y-h-14;tip.style.left=Math.max(4,l)+'px';tip.style.top=Math.max(4,t)+'px';}
+function hideTip(){tip.style.display='none';}
+function niceTicks(lo,hi,n){const raw=(hi-lo)/n,mag=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/mag,step=(f<1.5?1:f<3?2:f<7?5:10)*mag,out=[];for(let v=Math.ceil(lo/step)*step;v<=hi+1e-9;v+=step)out.push(+v.toFixed(10));return {ticks:out,dec:Math.max(0,-Math.floor(Math.log10(step)+1e-9))};}
+function hoverLock(host){host.addEventListener('mouseenter',()=>{S.hover=true;});host.addEventListener('mouseleave',()=>{S.hover=false;hideTip();if(S.dirty){S.dirty=false;renderAll();}});}
+
+function lineChart(host,c){
+  const W=Math.max(260,host.clientWidth||300),H=c.h,m={l:48,r:c.rm,t:14,b:20};
+  const iw=W-m.l-m.r,ih=H-m.t-m.b,pts=c.pts,n=c.n;
+  let lo=Infinity,hi=-Infinity;
+  pts.forEach(p=>{lo=Math.min(lo,p.y);hi=Math.max(hi,p.y);});
+  (c.dots||[]).forEach(p=>{lo=Math.min(lo,p.y);hi=Math.max(hi,p.y);});
+  c.refs.forEach(r=>{if(r.dom){lo=Math.min(lo,r.y);hi=Math.max(hi,r.y);}});
+  const pd=(hi-lo)*0.08||1;lo-=pd;hi+=pd;
+  const step=n<2?0:iw/(n-1);
+  const X=k=>m.l+k*step,Y=v=>m.t+ih*(1-(v-lo)/(hi-lo));
+  const nt=niceTicks(lo,hi,4),ms=c.ms||6;
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(c.aria)}">`;
+  (c.bands||[]).forEach(b=>{s+=`<rect x="${X(b.k0)-step/2}" y="${m.t}" width="${(b.k1-b.k0+1)*step}" height="${ih}" fill="color-mix(in srgb,var(${b.col}) 13%,transparent)"/>`;});
+  if(c.pend){const x0=X(n-c.pend)-step/2;s+=`<rect x="${x0}" y="${m.t}" width="${W-m.r-x0}" height="${ih}" fill="var(--sel-bg)"/><text x="${(x0+W-m.r)/2}" y="${m.t+11}" text-anchor="middle" font-size="10" fill="var(--ink2)">측정 대기</text>`;}
+  nt.ticks.forEach(v=>{const y=Y(v);s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="var(--grid)"/><text x="${m.l-6}" y="${y+3}" text-anchor="end" font-size="10" fill="var(--muted)">${v.toFixed(nt.dec)}</text>`;});
+  [0,Math.floor((n-1)/2),n-1].forEach((k,idx)=>{s+=`<text x="${X(k)}" y="${H-5}" text-anchor="${idx===0?'start':idx===2?'end':'middle'}" font-size="10" fill="var(--muted)">${c.xt(k)}</text>`;});
+  let lastLy=-99;
+  c.refs.slice().sort((a,b)=>Y(a.y)-Y(b.y)).forEach(r=>{
+    if(r.y<lo||r.y>hi)return;const y=Y(r.y);
+    const col=r.cls==='spec'?'var(--crit)':r.cls==='tgt'?'var(--axis)':'var(--muted)';
+    s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="${r.cls==='spec'?1.5:1}" ${r.cls==='tgt'?'':`stroke-dasharray="${r.cls==='spec'?'6 3':'2 3'}"`}/>`;
+    if(y-lastLy>=11){s+=`<text x="${W-m.r+4}" y="${y+3}" font-size="10" fill="var(--ink2)">${r.label} ${r.txt!=null?r.txt:fmt(r.y,c.dec)}</text>`;lastLy=y;}
+  });
+  (c.marks||[]).forEach(mk=>{const x=X(mk.k);s+=`<line x1="${x}" x2="${x}" y1="${m.t}" y2="${H-m.b}" stroke="var(--s2)" stroke-width="1.5" stroke-dasharray="3 3"/><text x="${Math.min(x+3,W-m.r-34)}" y="${m.t+9}" font-size="10" fill="var(--ink2)">${mk.label}</text>`;});
+  (c.dots||[]).forEach(p=>{s+=`<circle cx="${X(p.k)}" cy="${Y(p.y)}" r="2.8" fill="var(--surface)" stroke="var(${p.col||'--s1'})" stroke-width="1.4"/>`;});
+  if(pts.length){
+    s+=`<path d="${pts.map((p,i)=>((i===0||p.k-pts[i-1].k>1)?'M':'L')+X(p.k).toFixed(1)+' '+Y(p.y).toFixed(1)).join('')}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    pts.forEach(p=>{
+      const x=X(p.k),y=Y(p.y);
+      if(p.cls==='crit')s+=`<path d="M${x} ${y-ms}L${x+ms} ${y}L${x} ${y+ms}L${x-ms} ${y}Z" fill="var(--crit)" stroke="var(--surface)" stroke-width="1.5"/>`;
+      else if(p.cls==='warn')s+=`<circle cx="${x}" cy="${y}" r="${ms*0.75}" fill="var(--warn)" stroke="var(--surface)" stroke-width="2"/>`;
+      else if(p.col)s+=`<circle cx="${x}" cy="${y}" r="3.6" fill="var(${p.col})" stroke="var(--surface)" stroke-width="1.5"/>`;
+    });
+    const lp=pts[pts.length-1];s+=`<circle cx="${X(lp.k)}" cy="${Y(lp.y)}" r="4.2" fill="var(${lp.col||'--s1'})" stroke="var(--surface)" stroke-width="2"/>`;
+  }
+  s+=`<line id="xh" x1="0" x2="0" y1="${m.t}" y2="${H-m.b}" stroke="var(--ink2)" stroke-width="1" visibility="hidden"/><circle id="xc" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>`;
+  s+=`<rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" id="ov"/></svg>`;
+  host.innerHTML=s;
+  hoverLock(host);
+  if(!pts.length)return;
+  const ov=host.querySelector('#ov'),xh=host.querySelector('#xh'),xc=host.querySelector('#xc');
+  const mv=e=>{const r=host.getBoundingClientRect(),px=e.clientX-r.left;let best=pts[0],bd=1e9;pts.forEach(p=>{const d=Math.abs(X(p.k)-px);if(d<bd){bd=d;best=p;}});
+    xh.setAttribute('x1',X(best.k));xh.setAttribute('x2',X(best.k));xh.setAttribute('visibility','visible');xc.setAttribute('cx',X(best.k));xc.setAttribute('cy',Y(best.y));xc.setAttribute('visibility','visible');showTip(c.tip(best),e.clientX,e.clientY);};
+  ov.addEventListener('pointermove',mv);ov.addEventListener('pointerdown',mv);
+  ov.addEventListener('pointerleave',()=>{xh.setAttribute('visibility','hidden');xc.setAttribute('visibility','hidden');hideTip();});
+}
+function scatter(host,c){
+  const W=Math.max(220,host.clientWidth||300),H=c.h,m={l:46,r:12,t:8,b:30};
+  const iw=W-m.l-m.r,ih=H-m.t-m.b;
+  let xl=Math.min(...c.pts.map(p=>p.x)),xh=Math.max(...c.pts.map(p=>p.x)),yl=Math.min(...c.pts.map(p=>p.y)),yh=Math.max(...c.pts.map(p=>p.y));
+  c.hl.forEach(r=>{yl=Math.min(yl,r);yh=Math.max(yh,r);});
+  const px=(xh-xl)*0.06||1,py=(yh-yl)*0.08||1;xl-=px;xh+=px;yl-=py;yh+=py;
+  const X=v=>m.l+iw*(v-xl)/(xh-xl),Y=v=>m.t+ih*(1-(v-yl)/(yh-yl));
+  const tx=niceTicks(xl,xh,4),ty=niceTicks(yl,yh,4);
+  let s=`<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(c.aria)}">`;
+  ty.ticks.forEach(v=>{s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${m.l-6}" y="${Y(v)+3}" text-anchor="end" font-size="10" fill="var(--muted)">${v.toFixed(ty.dec)}</text>`;});
+  tx.ticks.forEach(v=>{s+=`<text x="${X(v)}" y="${H-14}" text-anchor="middle" font-size="10" fill="var(--muted)">${v.toFixed(tx.dec)}</text>`;});
+  s+=`<text x="${m.l+iw/2}" y="${H-2}" text-anchor="middle" font-size="10" fill="var(--ink2)">${esc(c.xl)}</text>`;
+  c.hl.forEach(r=>{if(r>=yl&&r<=yh)s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(r)}" y2="${Y(r)}" stroke="var(--crit)" stroke-width="1.5" stroke-dasharray="6 3"/>`;});
+  s+=`<line x1="${X(xl)}" y1="${Y(c.fit(xl))}" x2="${X(xh)}" y2="${Y(c.fit(xh))}" stroke="var(--ink2)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  c.pts.forEach((p,k)=>{if(!p.recent)s+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="3.5" fill="var(--s1)" stroke="var(--surface)" stroke-width="1.5" data-k="${k}"/>`;});
+  c.pts.forEach((p,k)=>{if(p.recent)s+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="5.5" fill="var(--s2)" stroke="var(--surface)" stroke-width="2" data-k="${k}"/>`;});
+  s+='</svg>';host.innerHTML=s;
+  host.querySelectorAll('circle[data-k]').forEach(el=>{
+    el.addEventListener('pointermove',e=>showTip(c.tip(c.pts[+el.dataset.k]),e.clientX,e.clientY));
+    el.addEventListener('pointerleave',hideTip);
+  });
+  hoverLock(host);
+}
+
+/* ====================== 렌더링 ====================== */
+function cpk(C,m){const a=C.lots.filter(l=>l.measured&&l.i>=Math.max(BASE_N-10,0)).slice(-30).flatMap(l=>l.wf.map((w,i)=>w[m]-tg(m,l.q))),tol=METS[m].tol,mu=mean(a),s=sd(a);return (tol-Math.abs(mu))/(3*s);}
+function chSev(C){const act=S.alerts.filter(a=>a.ch===C.id&&a.status==='active');return act.some(a=>a.sev==='crit')?'crit':act.length?'warn':'ok';}
+const worst=l=>l.includes('crit')?'crit':l.includes('warn')?'warn':'ok';
+const cpkSev=v=>v>=1.33?'ok':v>=1?'warn':'crit';
+
+function renderStats(){
+  const act=S.alerts.filter(a=>a.status==='active'),cr=act.filter(a=>a.sev==='crit').length,wr=act.length-cr;
+  let mn=Infinity,mt='';S.chs.forEach(C=>MK.forEach(m=>{const v=cpk(C,m);if(v<mn){mn=v;mt=`${C.label} ${METS[m].label}`;}}));
+  const de=S.faultLog.filter(f=>f.det!=null).map(f=>f.det-f.start),dm=S.faultLog.filter(f=>f.detMet!=null).map(f=>f.detMet-f.start);
+  const dtxt=de.length?`설비 Log 기준 평균 <b>${Math.round(mean(de))}분</b>${dm.length?` · 계측 반영 기준 <b>${Math.round(mean(dm))}분</b>`:''}`:'감지 이력 없음';
+  $('#stats').innerHTML=`<div class="it"><span class="sub">활성 알림</span><b>${cr}</b><span class="sub">위험</span><b>${wr}</b><span class="sub">경고</span></div>
+  <div class="it"><span class="sub">최저 Cpk</span><b>${fmt(mn,2)}</b>${badge(cpkSev(mn))}<span class="sub">${mt}</span></div>
+  <div class="it"><span class="sub">이상 발생 → 알림</span><span>${dtxt}</span></div>`;
+}
+function renderGrid(){
+  $('#grid').innerHTML=EQUIP.map(e=>{
+    const cs=S.chs.filter(c=>c.eq===e),sv=worst(cs.map(chSev));
+    return `<div class="eqcard ${sv}"><div class="eqh"><b>${e}</b>${badge(sv)}</div>${cs.map(C=>{
+      const q=ppidOf(C,C.lots.length),ml=C.lots.filter(l=>l.measured),l=ml[ml.length-1],cv=chSev(C);
+      return `<button class="chbtn ${C.id===S.sel?'sel':''}" data-ch="${C.id}" aria-pressed="${C.id===S.sel}">
+        <span class="l1"><b>CH-${C.ch}</b>${badge(cv)}</span>
+        <span class="sub">${sw(q)}${q} 진행 중</span>
+        <span class="sub">Thk ${sgn(l.md.thk,2)} Å · Cpk ${fmt(cpk(C,'thk'),2)}</span></button>`;}).join('')}</div>`;}).join('');
+}
+function renderFbar(){
+  const C=curCh();
+  $('#fbar').innerHTML=`<span class="path">${C.eq} ▸ CH-${C.ch}</span><span class="sub">PPID</span>
+   <button class="pp ${S.ppf==='all'?'on':''}" data-pp="all">전체</button>${PP.map(q=>`<button class="pp ${S.ppf===q?'on':''}" data-pp="${q}">${sw(q)}${q}</button>`).join('')}
+   <span class="sub">${S.ppf==='all'?'모든 PPID를 Setpoint·Target 대비 편차로 표시':PPIDS[S.ppf].desc+' · Lot만 표시'}</span>`;
+}
+const flagTxt=f=>f==='crit'?'Spec Out':f==='warn'?'OOC':'정상';
+function renderEq(){
+  const C=curCh(),p=S.parSel,P=PARAMS[p],n=EQ_WIN,sm=C.samples.slice(-n),last=sm[sm.length-1];
+  $('#eqTitle').textContent=`설비 Log — ${C.label}`;
+  $('#parSeg').innerHTML=PK.map(q=>`<button data-par="${q}" class="${q===p?'on':''}">${PARAMS[q].label}</button>`).join('');
+  const f=last.fl[p],inProg=(last.k+1)%SPL||SPL,lotId='L2611'+C.eq.slice(-1)+C.ch+pad(C.lots.length+1,3);
+  $('#eqSub').innerHTML=`1분 단위 수집 · Setpoint 대비 편차 · 현재 ${fmt(last.v[p],P.dec)} ${P.unit} (<b>${sgn(last.d[p],P.dec)}</b>) ${f==='crit'?badge('crit','FDC Spec Out'):badge('ok','정상')} · 진행 중 ${lotId} ${sw(last.q)}${last.q} (${inProg}/${SPL})`;
+  const first=sm[0].k,vis=S.ppf==='all'?sm:sm.filter(s=>s.q===S.ppf);
+  const bands=[];let b=null;sm.forEach(s=>{if(!b||b.li!==s.li){b={li:s.li,k0:s.k-first,k1:s.k-first,col:PPIDS[s.q].col};bands.push(b);}else b.k1=s.k-first;});
+  const marks=S.alerts.filter(a=>a.ch===C.id&&a.src==='eq'&&a.item===p&&a.k0>=first).map(a=>({k:a.k0-first,label:'알림'}));
+  lineChart($('#c-eq'),{h:230,rm:62,dec:P.dec,n,ms:3.5,aria:`${C.label} ${P.label} 추이`,marks,bands:S.ppf==='all'?bands:bands.filter(x=>PPIDS[S.ppf].col===x.col),
+    xt:i=>hhmm(kTime(first+i)),
+    pts:vis.map(s=>({k:s.k-first,y:s.d[p],cls:s.fl[p],s})),
+    refs:[{y:P.fdc,label:'Hi',txt:'+'+P.fdc,cls:'spec',dom:true},{y:0,label:'SP',txt:'0',cls:'tgt',dom:true},{y:-P.fdc,label:'Lo',txt:'−'+P.fdc,cls:'spec',dom:true}],
+    tip:q=>`${hhmm(q.s.t)} · ${C.label}<br>${sw(q.s.q)}${q.s.q}<br>${P.label} <b>${fmt(q.s.v[p],P.dec)} ${P.unit}</b> (Setpoint ${sgn(q.y,P.dec)}) ${q.cls==='crit'?'· FDC Spec Out':''}`});
+  $('#legE').innerHTML=`<span><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--s1)" stroke-width="2"/></svg>설비 Log</span><span><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--crit)" stroke-width="1.5" stroke-dasharray="6 3"/></svg>FDC Spec</span><span><svg width="12" height="12"><path d="M6 0L12 6L6 12L0 6Z" fill="var(--crit)"/></svg>FDC Spec Out</span><span><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--s2)" stroke-width="1.5" stroke-dasharray="3 3"/></svg>알림 발생</span><span>배경색:</span>${PP.map(q=>`<span>${sw(q)}${q}</span>`).join('')}`;
+}
+function renderMet(){
+  const C=curCh(),m=S.metSel,M=METS[m],b=C.base[m],L=C.lots.length,n=MET_SLOTS,first=L-(n-1);
+  $('#metTitle').textContent=`공정 계측 — ${C.label}`;
+  $('#metSeg').innerHTML=MK.map(q=>`<button data-met="${q}" class="${q===m?'on':''}">${METS[q].label}</button>`).join('');
+  const ml=C.lots.filter(l=>l.measured),last=ml[ml.length-1];
+  $('#metSub').innerHTML=`Lot·Wafer 단위 수집(공정 종료 후 ${MDELAY} Lot 뒤 도착) · Target 대비 편차 · 최근 ${last.id} ${sw(last.q)}${last.q} <b>${fmt(last.met[m],M.dec)} ${M.unit}</b> (${sgn(last.md[m],M.dec)}) ${last.fl[m]==='crit'?badge('crit','Spec Out'):last.fl[m]==='warn'?badge('warn','OOC'):badge('ok','정상')}`;
+  const vis=ml.filter(l=>l.i>=first&&(S.ppf==='all'||l.q===S.ppf));
+  const marks=S.alerts.filter(a=>a.ch===C.id&&a.src==='met'&&a.item===m&&a.li!=null&&a.li>=first).map(a=>({k:a.li-first,label:'알림'}));
+  lineChart($('#c-met'),{h:230,rm:70,dec:M.dec,n,pend:n-1-(ml[ml.length-1].i-first),aria:`${C.label} ${M.label} Lot 추이`,marks,
+    xt:i=>{const li=first+i,l=C.lots[li];return l?hhmm(l.t):hhmm(kTime(lotEndK(li)));},
+    pts:vis.map(l=>({k:l.i-first,y:l.md[m],cls:l.fl[m],lot:l,col:PPIDS[l.q].col})),
+    dots:vis.flatMap(l=>l.wf.map(w=>({k:l.i-first,y:w[m]-tg(m,l.q),col:PPIDS[l.q].col}))),
+    refs:[{y:M.tol,label:'USL',txt:'+'+M.tol,cls:'spec',dom:true},{y:b.mu+3*b.sd,label:'UCL',txt:sgn(b.mu+3*b.sd,M.dec),cls:'ctrl'},{y:0,label:'Target',txt:'0',cls:'tgt',dom:true},{y:b.mu-3*b.sd,label:'LCL',txt:sgn(b.mu-3*b.sd,M.dec),cls:'ctrl'},{y:-M.tol,label:'LSL',txt:'−'+M.tol,cls:'spec',dom:true}],
+    tip:p=>`<b>${p.lot.id}</b> · ${p.lot.prod}<br>${sw(p.lot.q)}${p.lot.q} · ${mdhm(p.lot.t)}<br>Lot 평균 <b>${fmt(p.lot.met[m],M.dec)} ${M.unit}</b> (Target ${sgn(p.y,M.dec)})<br>${p.lot.wf.map(w=>'W'+pad(w.slot)+' '+fmt(w[m],M.dec)).join(' · ')}`});
+  $('#legM').innerHTML=`<span><svg width="12" height="12"><circle cx="6" cy="6" r="3.5" fill="var(--surface)" stroke="var(--s1)" stroke-width="1.4"/></svg>Wafer 측정값 (W01/W13/W25)</span><span><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--s1)" stroke-width="2"/></svg>Lot 평균 (점 색 = PPID)</span><span><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--crit)" stroke-width="1.5" stroke-dasharray="6 3"/></svg>Spec</span><span><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--muted)" stroke-dasharray="2 3"/></svg>관리한계 μ±3σ</span><span><svg width="12" height="12"><path d="M6 0L12 6L6 12L0 6Z" fill="var(--crit)"/></svg>Spec Out</span><span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="var(--warn)"/></svg>OOC</span>${PP.map(q=>`<span>${sw(q)}${q}</span>`).join('')}`;
+}
+function renderBanner(){
+  const crit=S.alerts.filter(a=>a.status==='active'&&a.sev==='crit').sort((x,y)=>y.last-x.last),b=$('#banner');
+  const n=S.alerts.filter(a=>a.status==='active').length;
+  document.title=(n?`(${n}) `:'')+'Diffusion 공정·설비 Monitoring';
+  if(!crit.length){b.hidden=true;return;}
+  const a=crit[0];b.hidden=false;
+  b.innerHTML=`<div>${icon('crit')} <b>위험 ${crit.length}건</b> — [${ch(a.ch).label}] ${ITEM[a.item]} ${a.type}</div><button data-act="viewAlert" data-id="${a.id}">원인 분석 보기</button>`;
+}
+function renderAlerts(){
+  const list=S.alerts.filter(a=>S.showAll||a.status==='active').sort((x,y)=>(x.status==='active'?0:1)-(y.status==='active'?0:1)||(x.sev==='crit'?0:1)-(y.sev==='crit'?0:1)||y.last-x.last);
+  const sig=S.selAlert+'|'+S.showAll+'|'+list.map(a=>a.id+a.status+a.sev+a.count).join(',');
+  if(sig===S.sigAlerts)return;S.sigAlerts=sig;
+  const ST={active:'',closed:' · 조치 완료',cleared:' · 자동 해소',fp:' · 오탐'};
+  $('#alerts').innerHTML=list.length?list.map(a=>`<button class="al ${a.sev} ${a.status!=='active'?'done':''} ${a.id===S.selAlert?'sel':''}" data-alert="${a.id}">
+    <div class="r1">${icon(a.sev)}<b>${ch(a.ch).label} · ${ITEM[a.item]}</b><span class="chip">${a.src==='met'?'계측':'설비'}</span></div>
+    <div class="sub">${a.type} · ${mdhm(kTime(a.k0))}${ST[a.status]}</div></button>`).join(''):'<div class="sub" style="padding:12px">표시할 알림이 없습니다.</div>';
+}
+function renderRCA(force){
+  const host=$('#rca'),a=S.alerts.find(x=>x.id===S.selAlert);
+  if(!a){host.innerHTML='<h2>원인 분석 · 조치</h2><div class="sub">선택된 알림이 없습니다. 이상이 감지되면 원인 후보가 자동으로 제시됩니다.</div>';return;}
+  const ae=document.activeElement;
+  if(!force&&host.contains(ae)&&/TEXTAREA|INPUT/.test(ae.tagName))return;
+  const an=analyze(a),u=uiOf(a,an),M=an.M,C=ch(a.ch),act=a.status==='active',cause=u.cause,top=an.cands[0];
+  const cd=an.cands.find(c=>c.p===cause)||top,P=PARAMS[cd.p];
+  const predTxt=an.pred==null?'':`현재 설비 조건(${sw(an.q)}${an.q})이 이어지면 ${M.label}은 약 <b>${fmt(an.pred,M.dec)} ${M.unit}</b>(Target ${sgn(an.pred-an.tgt,M.dec)})로 예상되며 Spec 이탈 확률은 <b>${fmt(an.pOut*100,an.pOut<0.01?2:0)}%</b>입니다.`;
+  const inf=inferAll(S.metSel),fd=inf.finds.find(f=>f.chs.includes(a.ch));
+  const ppTxt=an.byPp.filter(x=>x.s).map(x=>`${sw(x.q)}${x.q} ${sgn(x.s.mu,M.dec)}`).join(' · ');
+  let lead;
+  if(a.src==='eq'){
+    const Q=PARAMS[a.item];
+    lead=`<b>${C.label} ${Q.label}</b>이(가) Setpoint 대비 평소보다 <b>${sgn(an.delta[a.item],Q.dec)} ${Q.unit}</b> 벗어나 있습니다 (${hhmm(kTime(onsetSample(C,a.item)))}경부터). ${predTxt} 변동 이후 처리된 <b>${an.affected} Lot</b>이 영향권이며, 계측 결과는 ${MDELAY} Lot 뒤에 반영됩니다.`;
+  }else{
+    lead=`<b>${C.label} ${M.label}</b> 최근 4 Lot 평균이 Target 대비 <b>${sgn(an.m4,M.dec)} ${M.unit}</b>로 벗어났습니다 (${hhmm(kTime(lotEndK(an.onM)))}경 Lot부터). 같은 시점에 가장 크게 변한 설비 항목은 <b>${PARAMS[top.p].label}</b>(${sgn(top.delta,PARAMS[top.p].dec)} ${PARAMS[top.p].unit})입니다. ${predTxt}`;
+  }
+  const rows=an.cands.slice(0,3).map((c,i)=>`<button class="cand ${c.p===cause?'on':''}" data-act="cause" data-p="${c.p}" ${act?'':'disabled'}>
+    <div class="r"><b>${i+1}. ${PARAMS[c.p].label}</b><span class="sub">근거 점수 ${fmt(c.score,2)}</span></div>
+    <span class="barbg"><span class="bar" style="width:${Math.round(c.score*100)}%"></span></span>
+    <div class="sub">${c.on==null?'뚜렷한 변동 없음':`${sgn(c.delta,PARAMS[c.p].dec)} ${PARAMS[c.p].unit} 변동 · ${hhmm(kTime(c.on))}부터 · 계측 영향 ${sgn(c.effect,M.dec)} ${M.unit} 예상`}${c.pm?` · 직전 PM: ${esc(c.pm.title)}`:''}</div></button>`).join('');
+  const ps=ACT[cause],stepsHtml=ps.steps.map((s,i)=>`<label><input type="checkbox" data-step="${i}" ${u.checked[i]?'checked':''} ${act?'':'disabled'}> <span>${s}</span></label>`).join('');
+  const tbl=an.cands.map(c=>`<tr><td class="l">${PARAMS[c.p].label}</td><td>${fmt(c.score,2)}</td><td>${sgn(c.r,2)} <span class="sub">(p ${pfmt(c.pv)})</span></td><td>${c.on==null?'-':sgn(c.z,1)}</td><td>${sgn(c.delta,PARAMS[c.p].dec)}</td><td>${sgn(c.effect,M.dec)}</td><td>${c.on==null?'-':hhmm(kTime(c.on))}</td></tr>`).join('');
+  host.innerHTML=`
+  <h2><span>🔍 원인 분석 · 조치 <span class="sub">A-${pad(a.id,3)} · ${C.label} · ${ITEM[a.item]} ${a.type}${act?'':' · 종결됨'}</span></span></h2>
+  <div class="rca3">
+    <div>
+      <h3>① 무슨 일이 있나요?</h3>
+      <p class="lead">${lead}</p>
+      <div class="big"><div><span class="sub">예상 ${M.label}</span><b>${an.pred==null?'-':fmt(an.pred,M.dec)}<span class="sub"> ${M.unit}</span></b></div><div><span class="sub">Spec 이탈 확률</span><b>${an.pOut==null?'-':fmt(an.pOut*100,an.pOut<0.01?2:0)+'%'}</b></div></div>
+      ${ppTxt?`<div class="sub">PPID별 최근 Lot 평균 (Target 대비): ${ppTxt}</div>`:''}
+      ${fd?`<div class="find ${fd.sev==='crit'?'crit':''}" style="margin-top:8px"><b class="t">연관관계 추정: ${fd.type}</b><br>${fd.text}</div>`:''}
+    </div>
+    <div>
+      <h3>② 유력한 원인 후보 <span class="sub">(선택하여 확정)</span></h3>
+      ${rows}
+      <details id="det" ${S.detOpen?'open':''}><summary>상세 통계 보기</summary>
+        <div class="scroll"><table><thead><tr><th class="l">후보</th><th>점수</th><th>상관 r (n=${an.W} Lot)</th><th>Shift z</th><th>변동량</th><th>계측 영향 예상</th><th>변동 시작</th></tr></thead><tbody>${tbl}</tbody></table></div>
+        <ul class="ev"><li>점수 = 0.40·계측 영향 비율 + 0.30·Shift z + 0.20·변동 선행도 + 0.10·|r| (+PM 시점 일치 0.10)</li><li>${M.label} 기준 구간(Target 대비) μ=${sgn(an.bm.mu,M.dec)}, σ=${fmt(an.bm.sd,M.dec)} · 다중 회귀 잔차 σ=${an.rs==null?'-':fmt(an.rs,M.dec)}</li><li>추세 ${sgn(an.slope,M.dec)} ${M.unit}/Lot → Spec 이탈 도달 ${an.eta==null?'-':an.eta<0.5?'이미 이탈 수준':'약 '+Math.round(an.eta)+' Lot 후'} · 영향 Lot ${an.affected}개 중 계측 Spec Out ${an.soLots}개</li></ul>
+        <div class="sub" style="margin-top:6px">${P.label} ↔ ${M.label} 산점도 (Lot 평균 편차, 주황: 최근 3 Lot)</div><div class="chart" id="sc"></div>
+      </details>
+    </div>
+    <div>
+      <h3>③ 조치 ${act?'':'(종결됨)'}</h3>
+      <div class="sub" style="margin-bottom:4px">확정 후보: <b>${ps.cause}</b></div>
+      <div class="steps">${stepsHtml}</div>
+      <textarea id="memo" placeholder="엔지니어 메모 (선택)" ${act?'':'disabled'}>${esc(u.memo)}</textarea>
+      <div class="actrow"><button class="btn-primary" id="btnApprove" data-act="approve" ${act&&Object.values(u.checked).some(Boolean)?'':'disabled'}>원인 확정 · 조치 승인</button><button data-act="fp" ${act?'':'disabled'}>오탐 처리</button></div>
+    </div>
+  </div>`;
+  $('#det').addEventListener('toggle',e=>{S.detOpen=e.target.open;});
+  const ML=C.lots.filter(l=>l.measured),lots=ML.slice(-WIN),x=lots.map(l=>l.pd[cd.p]),y=lots.map(l=>l.md[an.mk]),r=pearson(x,y),slp=r*sd(y)/sd(x),ic=mean(y)-slp*mean(x),n=lots.length;
+  scatter($('#sc'),{h:190,xl:`${P.label} Setpoint 대비 편차 (${P.unit})`,aria:'산점도',hl:[M.tol,-M.tol],fit:v=>ic+slp*v,
+    pts:lots.map((l,i)=>({x:l.pd[cd.p],y:l.md[an.mk],recent:i>=n-3,lot:l})),
+    tip:p=>`<b>${p.lot.id}</b> ${p.lot.q}<br>${P.label} ${sgn(p.x,P.dec)} ${P.unit}<br>${M.label} Target ${sgn(p.y,M.dec)} ${M.unit}`});
+}
+function renderInfer(){
+  const m=S.metSel,M=METS[m],inf=inferAll(m),host=$('#infer');
+  const rows=S.chs.map((C,ri)=>{
+    return `<tr><td class="l">${C.ch==='A'?`<b>${C.eq}</b> `:`<span class="sub">${C.eq}</span> `}CH-${C.ch}</td>${PP.map(q=>{
+      const s=inf.cell[C.id+'|'+q];
+      if(!s)return `<td class="wait" data-ch="${C.id}" data-pp="${q}">—</td>`;
+      const pct=Math.round(Math.min(1,Math.abs(s.z)/6)*80),col=s.mu>=0?'--div-pos':'--div-neg';
+      return `<td data-ch="${C.id}" data-pp="${q}" class="${C.id===S.sel&&S.ppf===q?'selc':''}" data-tip="<b>${C.label}</b> · ${q}<br>${M.label} 최근 ${s.n} Lot 평균 Target 대비 ${sgn(s.mu,M.dec)} ${M.unit}<br>z = ${sgn(s.z,1)} ${s.flag?'(이상)':'(정상 범위)'}" style="background:color-mix(in srgb,var(${col}) ${pct}%,var(--div-mid))"><span class="cellf">${s.flag?icon('crit'):''}${sgn(s.mu,M.dec)}</span></td>`;}).join('')}</tr>`;}).join('');
+  const finds=inf.finds.length?inf.finds.map(f=>`<div class="find ${f.sev==='crit'?'crit':''}"><b class="t">${icon(f.sev)} ${f.type}</b>${f.text}</div>`).join(''):`<div class="find ok"><b class="t">${icon('ok')} 뚜렷한 연관 패턴 없음</b>모든 설비·챔버·PPID가 정상 범위입니다. 이상 시나리오를 주입하면 챔버/설비 공통/PPID 요인을 자동으로 구분합니다.</div>`;
+  host.innerHTML=`<h2><span>🧭 설비 · 챔버 · PPID 연관관계 추정</span><span class="sub">${M.label} 기준 · 최근 6 Lot 평균 편차 (Target 대비) · 셀 클릭 → 해당 챔버·PPID 선택</span></h2>
+  <div class="infgrid"><div><div class="scroll"><table class="hm"><thead><tr><th class="l">설비 · 챔버</th>${PP.map(q=>`<th>${sw(q)}${q}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>
+  <div class="legend"><span><i class="sw" style="background:var(--div-neg)"></i> 음(−) 편차</span><span><i class="sw" style="background:var(--div-mid)"></i> 정상</span><span><i class="sw" style="background:var(--div-pos)"></i> 양(+) 편차</span><span>${icon('crit')} 이상 (|z|&gt;3.5)</span><span>— 데이터 부족(&lt;3 Lot)</span></div></div>
+  <div><h3>자동 해석 — 어디서 문제가 시작됐나?</h3><div class="finds">${finds}</div><div class="sub" style="margin-top:8px">판단 기준: 한 챔버의 여러 PPID가 함께 이상 → 챔버 요인 / 두 챔버가 함께 이상 → 설비 공통 요인 / 한 PPID만 이상 → Recipe 조건 요인.</div></div></div>`;
+  host.querySelectorAll('td[data-tip]').forEach(td=>{td.addEventListener('mousemove',e=>showTip(td.dataset.tip,e.clientX,e.clientY));td.addEventListener('mouseleave',hideTip);});
+}
+function renderTab(){
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===S.tab));
+  const C=curCh(),host=$('#tabBody');
+  if(S.tab==='acts'){
+    const VT={recovered:['ok','복귀 확인'],unresolved:['crit','미해결'],pending:['warn','복귀 검증 중'],fp:['ok','오탐 기록']};
+    const g={};S.actions.filter(a=>a.param).forEach(a=>{const k=a.ch+'|'+a.param;(g[k]||(g[k]={ch:a.ch,param:a.param,n:0,lots:0}));g[k].n++;g[k].lots+=a.lots||0;});
+    const arr=Object.values(g).sort((x,y)=>y.n-x.n||y.lots-x.lots),mx=Math.max(...arr.map(x=>x.n));
+    const rep=arr.map(x=>`<div class="rep"><span>${ch(x.ch).label} · ${ACT[x.param].cause}</span><span><span class="repbar" style="width:${Math.round(x.n/mx*100)}%"></span></span><span class="sub"><b>${x.n}회</b> · 누적 영향 ${x.lots} Lot ${x.n>=3?badge('crit','HW 개선 요구'):''}</span></div>`).join('');
+    const rows=S.actions.slice().reverse().slice(0,10).map(a=>{const v=VT[a.verdict],pend=a.verdict==='pending'?` (${Math.min(3,ch(a.ch).lots.filter(l=>l.measured&&l.i>=a.fixLot).length)}/3 Lot)`:'';
+      return `<tr><td class="l">${a.time}</td><td class="l">${ch(a.ch).label}</td><td class="l" style="white-space:normal">${esc(a.label)}</td><td class="l" style="white-space:normal;max-width:320px">${esc(a.action)}${a.memo?`<div class="sub">메모: ${esc(a.memo)}</div>`:''}</td><td>${a.lots||'-'}</td><td class="l">${badge(v[0],v[1]+pend)}</td></tr>`;}).join('');
+    host.innerHTML=`<h3>반복 불량 항목 <span class="sub">(3회 이상 → 설비 HW 개선 요구 근거)</span></h3>${rep}<h3 style="margin-top:16px">최근 조치 이력</h3><div class="scroll"><table><thead><tr><th class="l">일시</th><th class="l">챔버</th><th class="l">확정 원인</th><th class="l">조치 내용</th><th>영향 Lot</th><th class="l">결과</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }else if(S.tab==='lots'){
+    const L=C.lots.filter(l=>S.ppf==='all'||l.q===S.ppf).slice(-10).reverse();
+    const mc=(l,m)=>{if(!l.measured)return '<td class="wait">측정 대기</td>';const f=l.fl[m],w=l.wf.map(x=>x[m]);return `<td class="${f==='ok'?'':f}"><span class="cellf">${f==='ok'?'':icon(f)}${fmt(l.met[m],DEC[m])}</span><div class="sub">Target ${sgn(l.md[m],DEC[m])}</div></td>`;};
+    host.innerHTML=`<div class="sub" style="margin-bottom:6px">${C.label} · ${S.ppf==='all'?'전체 PPID':S.ppf} · 설비 값은 Lot 진행 중 수집한 6샘플 평균, 계측값은 Wafer 3매 평균</div><div class="scroll"><table><thead><tr><th class="l">종료</th><th class="l">Lot</th><th class="l">PPID</th><th class="l">제품</th><th>온도 (°C)</th><th>압력 (mTorr)</th><th>O₂ (slm)</th><th>Lamp (kW)</th><th>Thickness (Å)</th><th>XPS (at%)</th></tr></thead><tbody>${L.map(l=>`<tr><td class="l">${hhmm(l.t)}</td><td class="l">${l.id}</td><td class="l">${sw(l.q)}${l.q}</td><td class="l">${l.prod}</td>${PK.map(p=>`<td>${fmt(l.par[p],PARAMS[p].dec)}<div class="sub">${sgn(l.pd[p],PARAMS[p].dec)}</div></td>`).join('')}${mc(l,'thk')}${mc(l,'xps')}</tr>`).join('')}</tbody></table></div>`;
+  }else if(S.tab==='heat'){
+    const m=S.metSel,rv=(T2,p)=>{const L=T2.lots.filter(l=>l.measured).slice(-WIN);return pearson(L.map(l=>l.pd[p]),L.map(l=>l.md[m]));};
+    const rows=PK.map(p=>`<tr><td class="l">${PARAMS[p].label}</td>${S.chs.map(T2=>{const r=rv(T2,p),pct=Math.round(Math.min(1,Math.abs(r))*92);
+      return `<td data-ch="${T2.id}" class="${T2.id===S.sel?'selc':''}" data-tip="<b>${T2.label}</b> · ${PARAMS[p].label} ↔ ${METS[m].label}<br>r = ${sgn(r,2)} (최근 ${WIN} Lot)" style="background:color-mix(in srgb,var(${r>=0?'--div-pos':'--div-neg'}) ${pct}%,var(--div-mid));color:${Math.abs(r)>0.6?'#fff':'var(--ink)'}">${sgn(r,2)}</td>`;}).join('')}</tr>`).join('');
+    host.innerHTML=`<div class="sub" style="margin-bottom:6px">설비 Parameter(Setpoint 대비 Lot 평균 편차) ↔ ${METS[m].label}(Target 대비 편차) Pearson r · 챔버별 · 위 계측 항목 선택 버튼으로 전환</div><div class="scroll"><table class="hm"><thead><tr><th class="l">Parameter</th>${S.chs.map(T2=>`<th>${T2.eq.slice(-2)}/${T2.ch}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div><div class="sub" style="margin-top:6px">열 헤더 = 설비번호/챔버. 정상 챔버는 Parameter 변동이 작아 상관이 낮고, 이상 챔버는 해당 Parameter와 강한 상관이 나타납니다.</div>`;
+    host.querySelectorAll('td[data-tip]').forEach(td=>{td.addEventListener('mousemove',e=>showTip(td.dataset.tip,e.clientX,e.clientY));td.addEventListener('mouseleave',hideTip);});
+  }else if(S.tab==='fdc'){
+    const sl=getSlopes(),nL=S.chs.reduce((s,c2)=>s+c2.lots.filter(l=>l.measured).length,0);
+    const rows=PK.map(p=>{
+      const P=PARAMS[p];let allowed=Infinity,drv='';
+      MK.forEach(m=>{const s=Math.abs(sl[p][m]);if(s>1e-9){const al=METS[m].tol/s;if(al<allowed){allowed=al;drv=METS[m].label;}}});
+      const b3=3*mean(S.chs.map(T2=>T2.base[p].sd));
+      const vd=allowed<P.fdc*0.95?['crit','강화 필요']:allowed>P.fdc*1.5?['warn','완화 검토']:['ok','적정'];
+      return `<tr><td class="l">${P.label}</td><td>±${fmt(P.fdc,P.dec)}</td><td>±${fmt(b3,P.dec)}</td><td>±${fmt(allowed,P.dec)} <span class="sub">(${drv} 기준)</span></td><td class="l">${badge(vd[0],vd[1])}</td></tr>`;}).join('');
+    host.innerHTML=`<div class="sub" style="margin-bottom:6px">경험에 의존하던 FDC Spec을 데이터로 검토합니다. 허용폭 = 계측 Spec 허용 편차 ÷ (Parameter 1단위당 계측값 변화율, 전 챔버 ${nL} Lot 회귀). 단독 변동 기준 참고값이며 최종 확정은 엔지니어가 합니다.</div><div class="scroll"><table><thead><tr><th class="l">Parameter</th><th>현행 FDC Spec</th><th>정상 변동 3σ</th><th>공정 영향 기반 허용폭</th><th class="l">제안</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }else{
+    const pm=S.pm.filter(e=>e.ch===C.id).sort((a,b)=>b.lot-a.lot);
+    host.innerHTML=`<div class="sub" style="margin-bottom:6px">${C.label} · 설비 Shift 일보 · PM 이력</div><div class="scroll"><table><thead><tr><th class="l">시각</th><th class="l">구분</th><th class="l">내용</th></tr></thead><tbody>${pm.map(e=>`<tr><td class="l">${mdhm(kTime(lotEndK(e.lot)))}</td><td class="l"><span class="chip">${e.type}</span></td><td class="l" style="white-space:normal"><b>${esc(e.title)}</b><div class="sub">${esc(e.detail)}</div></td></tr>`).join('')}</tbody></table></div>`;
+  }
+}
+
+/* ====================== Recipe 시뮬레이션 ====================== */
+function initSim(){
+  $('#simCtl').innerHTML=`
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+     <label class="sub">챔버 <select id="simCh">${S.chs.map(c=>`<option value="${c.id}">${c.label}</option>`).join('')}</select></label>
+     <label class="sub">PPID(기준 Recipe) <select id="simPp">${PP.map(q=>`<option value="${q}">${q}</option>`).join('')}</select></label>
+   </div>
+   <div id="simSl">${PK.map(p=>`<div class="sl"><label for="sl-${p}"><b>${PARAMS[p].label}</b></label><input type="range" id="sl-${p}" data-sim="${p}" min="${SIMR[p][0]}" max="${SIMR[p][1]}" step="${SIMR[p][2]}" value="0"><span class="v" id="sv-${p}"></span></div>`).join('')}</div>
+   <label class="sub" style="display:block;margin:6px 0"><input type="checkbox" id="simCur" checked> 챔버의 현재 편차 반영 (현 상태에서 Recipe를 바꾼다고 가정)</label>
+   <label class="sub" style="display:block;margin:6px 0"><input type="checkbox" id="simCpl" checked> Lamp Power 변경 시 온도 연동 반영 (<span id="cplv"></span>)</label>
+   <div class="actrow"><button id="simFix">Target 맞춤 (온도로 보정)</button><button id="simReset">초기화</button></div>
+   <div class="sub" style="margin-top:10px">모델: 전 챔버 ${'<span id="simN"></span>'} Lot의 (설비 Parameter 편차 → 계측 편차) 다중 회귀. 챔버 고유 Offset을 반영합니다. 공정 시간 등 이력에 변동이 없는 항목은 예측에 포함하지 않았습니다.</div>`;
+  $('#simCh').value=S.sim.ch;$('#simPp').value=S.sim.pp;
+  $('#simCh').addEventListener('change',e=>{S.sim.ch=e.target.value;renderSimOut();});
+  $('#simPp').addEventListener('change',e=>{S.sim.pp=e.target.value;renderSimOut();});
+  document.querySelectorAll('[data-sim]').forEach(el=>el.addEventListener('input',()=>{S.sim.d[el.dataset.sim]=+el.value;renderSimOut();}));
+  $('#simCur').addEventListener('change',e=>{S.sim.cur=e.target.checked;renderSimOut();});
+  $('#simCpl').addEventListener('change',e=>{S.sim.couple=e.target.checked;renderSimOut();});
+  $('#simReset').addEventListener('click',()=>{PK.forEach(p=>{S.sim.d[p]=0;$('#sl-'+p).value=0;});renderSimOut();});
+  $('#simFix').addEventListener('click',()=>{const r=simSolveTemp();if(r==null)return;const [lo,hi]=SIMR.temp;S.sim.d.temp=Math.max(lo,Math.min(hi,Math.round(r*2)/2));$('#sl-temp').value=S.sim.d.temp;renderSimOut();});
+}
+function simCtx(){
+  const mod=simModel(),C=ch(S.sim.ch),q=S.sim.pp,d=S.sim.d;
+  const cur={};PK.forEach(p=>cur[p]=S.sim.cur?mean(C.samples.slice(-12).map(s=>s.d[p])):0);
+  const eff=dd=>{const e={};PK.forEach(p=>e[p]=dd[p]+cur[p]);if(S.sim.couple)e.temp+=mod.couple*dd.lamp;return e;};
+  const predict=(dd,m)=>{const e=eff(dd),b=mod.beta[m];let dev=C.base[m].mu;PK.forEach((p,i)=>{dev+=b[i+1]*e[p];});return dev;};
+  return {mod,C,q,d,cur,eff,predict};
+}
+function simSolveTemp(){
+  const x=simCtx(),dd=Object.assign({},x.d,{temp:0}),b=x.mod.beta.thk;
+  const rest=x.predict(dd,'thk'),needEff=-(rest-b[1]*0)/b[1];  /* temp 편차 기여를 뺀 값에서 0이 되도록 */
+  const base0=rest-b[1]*x.eff(dd).temp;                          /* temp 제외 기여 */
+  const needTemp=-base0/b[1];
+  return needTemp-x.cur.temp-(S.sim.couple?x.mod.couple*x.d.lamp:0);
+}
+function renderSimOut(){
+  const x=simCtx(),{mod,C,q,d,predict,eff}=x;
+  if(!mod||!C.base)return;
+  $('#simN').textContent=mod.n;$('#cplv').textContent=`1 kW ≈ ${fmt(mod.couple,2)} °C`;
+  const sp=PPIDS[q].sp;
+  PK.forEach(p=>{$('#sv-'+p).innerHTML=`${fmt(sp[p]+d[p],PARAMS[p].dec)} ${PARAMS[p].unit} <span class="sub">(${sgn(d[p],PARAMS[p].dec)})</span>`;});
+  const zero={temp:0,flow:0,press:0,lamp:0};
+  const cards=MK.map(m=>{
+    const M=METS[m],t=tg(m,q),dev=predict(d,m),dev0=predict(zero,m),rs=mod.rs[m];
+    const pOut=(1-Phi((M.tol-dev)/rs))+Phi((-M.tol-dev)/rs),cp=(M.tol-Math.abs(dev))/(3*rs),bad=Math.abs(dev)>M.tol;
+    return `<div class="mcard ${bad?'crit':''}"><div class="sub">${M.label} 예측 (Lot 평균)</div><div class="bv">${fmt(t+dev,M.dec)} <span class="sub">${M.unit}</span></div>
+      <div class="sub">Target ${fmt(t,M.dec)} · Spec ${fmt(t-M.tol,M.dec)}~${fmt(t+M.tol,M.dec)}</div>
+      <div style="margin:6px 0">${bad?badge('crit','Spec 이탈 예상'):Math.abs(dev)>M.tol*0.7?badge('warn','Spec 근접'):badge('ok','Spec 이내')}</div>
+      <div class="sub">변경 전(현 상태) ${fmt(t+dev0,M.dec)} → 변경 후 <b>${sgn(dev-dev0,M.dec)} ${M.unit}</b></div>
+      <div class="sub">Spec 이탈 확률 <b>${fmt(pOut*100,pOut<0.01?2:0)}%</b> · 예상 Cpk ${fmt(cp,2)} · 잔차 σ ${fmt(rs,M.dec)}</div></div>`;}).join('');
+  /* 영향 분해 */
+  const maxE={thk:0.001,xps:0.0001};
+  const contrib=PK.map(p=>{const o={p};MK.forEach(m=>{const b=mod.beta[m];let v=b[PK.indexOf(p)+1]*d[p];if(p==='lamp'&&S.sim.couple)v+=b[1]*mod.couple*d.lamp;o[m]=v;maxE[m]=Math.max(maxE[m],Math.abs(v));});return o;});
+  const win=p=>{
+    let lo=-Infinity,hi=Infinity,any=false;
+    MK.forEach(m=>{
+      const b=mod.beta[m],k=b[PK.indexOf(p)+1]+(p==='lamp'&&S.sim.couple?b[1]*mod.couple:0);
+      if(Math.abs(k)<1e-6)return;any=true;
+      const dd=Object.assign({},d,{[p]:0}),rest=predict(dd,m),a1=(-METS[m].tol-rest)/k,a2=(METS[m].tol-rest)/k;
+      lo=Math.max(lo,Math.min(a1,a2));hi=Math.min(hi,Math.max(a1,a2));
+    });
+    if(!any)return '영향 미미';
+    if(lo>hi)return '없음 (다른 변경 조정 필요)';
+    return `${sgn(lo,PARAMS[p].dec)} ~ ${sgn(hi,PARAMS[p].dec)} ${PARAMS[p].unit}`;
+  };
+  const rowsC=contrib.map(c=>{
+    const bar=(v,m)=>`<span class="cbar" style="width:${Math.round(Math.abs(v)/maxE[m]*60)}px;background:var(${v>=0?'--div-pos':'--div-neg'})"></span>`;
+    return `<tr><td class="l">${PARAMS[c.p].label}</td><td>${sgn(d[c.p],PARAMS[c.p].dec)} ${PARAMS[c.p].unit}</td><td>${bar(c.thk,'thk')} ${sgn(c.thk,2)} Å</td><td>${bar(c.xps,'xps')} ${sgn(c.xps,3)} at%</td><td class="l">${win(c.p)}</td></tr>`;}).join('');
+  /* 요약 문장 */
+  const chg=PK.filter(p=>Math.abs(d[p])>1e-9).map(p=>`${PARAMS[p].label} ${sgn(d[p],PARAMS[p].dec)} ${PARAMS[p].unit}`);
+  const dT=predict(d,'thk'),dX=predict(d,'xps'),tolT=METS.thk.tol,tolX=METS.xps.tol;
+  let sum;
+  if(!chg.length)sum=`Recipe를 변경하지 않은 ${S.sim.cur?'현재 챔버 상태':'기준 상태'}입니다. Thickness ${fmt(tg('thk',q)+dT,2)} Å, XPS ${fmt(tg('xps',q)+dX,3)} at% 예상.`;
+  else sum=`<b>${chg.join(', ')}</b> 변경 시 Thickness는 <b>${sgn(dT-predict(zero,'thk'),2)} Å</b>, XPS는 <b>${sgn(dX-predict(zero,'xps'),3)} at%</b> 변합니다. ${Math.abs(dT)>tolT||Math.abs(dX)>tolX?'<b>Spec을 벗어날 것으로 예상</b>됩니다 — 온도 보정(Target 맞춤) 또는 변경량 축소를 검토하세요.':'Spec 이내로 예상됩니다.'}`;
+  /* 응답 곡선 */
+  const sp2=S.sim.sweep,[lo,hi,st]=SIMR[sp2],N=41,mS=S.sim.met,MM=METS[mS];
+  const pts=[];for(let i=0;i<N;i++){const xv=lo+(hi-lo)*i/(N-1),dd=Object.assign({},d,{[sp2]:xv}),dev=predict(dd,mS);pts.push({k:i,y:tg(mS,q)+dev,xv,cls:Math.abs(dev)>MM.tol?'crit':'ok'});}
+  const curK=(d[sp2]-lo)/(hi-lo)*(N-1);
+  $('#simOut').innerHTML=`<div class="sim2">${cards}</div>
+   <p class="lead" style="margin:0 0 12px">${sum}</p>
+   <h3>변경 항목별 영향 분해</h3>
+   <div class="scroll"><table><thead><tr><th class="l">항목</th><th>변경량</th><th>Thickness 영향</th><th>XPS 영향</th><th class="l">단독 허용 변경 범위 (Spec 유지)</th></tr></thead><tbody>${rowsC}</tbody></table></div>
+   <div class="chh" style="margin-top:14px"><h3 style="margin:0">응답 곡선 — ${PARAMS[sp2].label} 변경에 따른 예측 ${MM.label}</h3>
+     <span style="display:flex;gap:8px;flex-wrap:wrap"><span class="seg" id="swSeg">${PK.map(p=>`<button data-sw="${p}" class="${p===sp2?'on':''}">${PARAMS[p].label}</button>`).join('')}</span><span class="seg" id="swMet">${MK.map(m=>`<button data-swm="${m}" class="${m===mS?'on':''}">${METS[m].label}</button>`).join('')}</span></span></div>
+   <div class="chart" id="c-sim"></div>`;
+  lineChart($('#c-sim'),{h:210,rm:70,dec:MM.dec,n:N,aria:'응답 곡선',marks:[{k:curK<0?0:curK>N-1?N-1:curK,label:'현재 설정'}].map(o=>({k:Math.round(o.k),label:o.label})),
+    xt:i=>`${fmt(sp[sp2]+lo+(hi-lo)*i/(N-1),PARAMS[sp2].dec)}${PARAMS[sp2].unit}`,
+    pts,refs:[{y:tg(mS,q)+MM.tol,label:'USL',cls:'spec',dom:true},{y:tg(mS,q),label:'Target',cls:'tgt',dom:true},{y:tg(mS,q)-MM.tol,label:'LSL',cls:'spec',dom:true}],ms:4,
+    tip:p=>`${PARAMS[sp2].label} Recipe <b>${fmt(sp[sp2]+p.xv,PARAMS[sp2].dec)} ${PARAMS[sp2].unit}</b> (${sgn(p.xv,PARAMS[sp2].dec)})<br>예측 ${MM.label} <b>${fmt(p.y,MM.dec)} ${MM.unit}</b> ${p.cls==='crit'?'· Spec 이탈':''}`});
+  $('#swSeg').addEventListener('click',e=>{const b=e.target.closest('[data-sw]');if(b){S.sim.sweep=b.dataset.sw;renderSimOut();}});
+  $('#swMet').addEventListener('click',e=>{const b=e.target.closest('[data-swm]');if(b){S.sim.met=b.dataset.swm;renderSimOut();}});
+}
+
+/* 매 샘플: 가벼운 영역 / Lot 종료 또는 사용자 조작: 전체 */
+function renderFast(){
+  $('#clock').textContent='시뮬레이션 '+mdhm(kTime(nowK()))+(S.running?' · LIVE':' · 일시정지');
+  $('#liveDot').className='dot '+(S.running?'on':'off');
+  renderStats();renderGrid();renderFbar();renderEq();renderBanner();renderAlerts();
+}
+function renderAll(force){
+  if(S.hover&&!force){S.dirty=true;return;}
+  if(!S.selAlert)pickNext();
+  renderFast();renderMet();renderRCA(!!force);renderInfer();renderTab();renderSimOut();
+}
+
+/* ====================== 이벤트 ====================== */
+function selectChamber(id,pp){
+  S.sel=id;if(pp!==undefined)S.ppf=pp;
+  S.sim.ch=id;$('#simCh').value=id;
+  if(S.ppf!=='all'){S.sim.pp=S.ppf;$('#simPp').value=S.ppf;}
+  renderAll(true);
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act],[data-ch],[data-pp],[data-alert],[data-par],[data-met],[data-tab]');if(!t)return;
+  const d=t.dataset;
+  if(d.ch){selectChamber(d.ch,d.pp);return;}
+  if(d.pp&&!d.ch){S.ppf=d.pp;if(d.pp!=='all'){S.sim.pp=d.pp;$('#simPp').value=d.pp;}renderAll(true);return;}
+  if(d.par){S.parSel=d.par;renderAll(true);return;}
+  if(d.met){S.metSel=d.met;renderAll(true);return;}
+  if(d.tab){S.tab=d.tab;renderTab();return;}
+  if(d.alert){selectAlert(+d.alert);return;}
+  if(d.act==='closeToast'){t.closest('.toast').remove();return;}
+  if(d.act==='viewAlert'){selectAlert(+d.id);$('#rca').scrollIntoView({behavior:'smooth',block:'start'});const ts=t.closest('.toast');if(ts)ts.remove();return;}
+  const a=S.alerts.find(x=>x.id===S.selAlert);if(!a)return;
+  if(d.act==='cause'){if(a.status!=='active')return;const u=S.ui[a.id];u.cause=d.p;u.checked={};renderRCA(true);return;}
+  if(d.act==='approve'){approve(a);return;}
+  if(d.act==='fp'){falseAlarm(a);return;}
+});
+function selectAlert(id){
+  const a=S.alerts.find(x=>x.id===id);if(!a)return;
+  S.selAlert=id;S.sel=a.ch;S.sim.ch=a.ch;$('#simCh').value=a.ch;
+  if(a.src==='eq')S.parSel=a.item;else S.metSel=a.item;
+  S.sigAlerts='';renderAll(true);
+}
+document.addEventListener('change',e=>{
+  const a=S.alerts.find(x=>x.id===S.selAlert);
+  if(e.target.dataset&&e.target.dataset.step!==undefined&&a){const u=S.ui[a.id];u.checked[e.target.dataset.step]=e.target.checked;const b=$('#btnApprove');if(b)b.disabled=!Object.values(u.checked).some(Boolean);}
+});
+document.addEventListener('input',e=>{if(e.target.id==='memo'){const a=S.alerts.find(x=>x.id===S.selAlert);if(a)S.ui[a.id].memo=e.target.value;}});
+$('#fAll').addEventListener('change',e=>{S.showAll=e.target.checked;S.sigAlerts='';renderAlerts();});
+$('#btnRun').addEventListener('click',()=>{S.running=!S.running;$('#btnRun').textContent=S.running?'⏸ 일시정지':'▶ 재생';renderAll(true);});
+$('#selSpeed').addEventListener('change',e=>{S.speed=+e.target.value;startTimer();});
+$('#btnTheme').addEventListener('click',()=>{const r=document.documentElement,cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),nx=cur==='dark'?'light':'dark';r.dataset.theme=nx;try{localStorage.setItem('dm-theme',nx);}catch(_){}});
+$('#selScen').innerHTML=Object.entries(SCEN).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join('')+'<option value="clear">모든 이상 해제</option>';
+$('#btnInject').addEventListener('click',()=>{
+  const k=$('#selScen').value;
+  if(k==='clear'){S.chs.forEach(C=>{C.faults=[];C.resetK=C.nextK;C.resetLot=C.lots.length;});toast({sev:'ok',title:'모든 이상 시나리오 해제',body:'설비 조건이 정상으로 복귀합니다.'});return;}
+  injectFault(k,nowK()+1);toast({title:'이상 주입',body:SCEN[k].name+' — 설비 Log 변동이 먼저 감지되고 이후 계측 결과에 반영됩니다.'});
+});
+window.addEventListener('resize',()=>{clearTimeout(S.rz);S.rz=setTimeout(()=>renderAll(true),150);});
+
+/* ====================== 챗봇 (대시보드 데이터 기반 Q&A) ====================== */
+/* model_name / base_url / api_key 는 코드에 없으며 화면에서만 입력받습니다. OpenAI 호환 Chat Completions API 사용. */
+const CFG={base:'',model:'',key:''};
+const CHAT={msgs:[],busy:false};
+const pOfR=(r,n)=>{if(n<4)return 1;const t=r*Math.sqrt((n-2)/Math.max(1e-9,1-r*r));return 2*(1-Phi(Math.abs(t)));};
+const strip=h=>String(h).replace(/<[^>]+>/g,'').replace(/&amp;/g,'&');
+function corr(lots,p,m,abs){
+  if(lots.length<6)return null;
+  const x=lots.map(l=>abs?l.par[p]:l.pd[p]),y=lots.map(l=>abs?l.met[m]:l.md[m]),r=pearson(x,y);
+  return {r,n:lots.length,p:pOfR(r,lots.length),slope:r*sd(y)/sd(x)};
+}
+const cfmt=c=>c?`r=${sgn(c.r,2)} (n=${c.n}, p ${pfmt(c.p)}, 기울기 ${sgn(c.slope,3)})`:'데이터 부족';
+function scopeOf(q){
+  const t=q.toLowerCase(),eqs=new Set(),cl=new Set();let m;
+  const r1=/dif[-\s]?0?([1-4])/g;while((m=r1.exec(t)))eqs.add(+m[1]);
+  const r2=/([1-4])\s?번\s?(?:설비|호기)|([1-4])\s?호기|설비\s?0?([1-4])/g;while((m=r2.exec(t)))eqs.add(+(m[1]||m[2]||m[3]));
+  const r3=/(?:ch|챔버|chamber)[-\s]?([ab])(?![a-z])|\b([ab])\s?챔버/gi;while((m=r3.exec(t)))cl.add((m[1]||m[2]).toUpperCase());
+  const pps=PP.filter(p=>t.includes(p.toLowerCase()));
+  let list=[];
+  if(eqs.size)list=S.chs.filter(c=>eqs.has(+c.eq.slice(-1))&&(!cl.size||cl.has(c.ch)));
+  else if(cl.size)list=S.chs.filter(c=>cl.has(c.ch));
+  const explicit=list.length>0;
+  if(!explicit){
+    const crit=S.alerts.filter(a=>a.status==='active').sort((x,y)=>(x.sev==='crit'?0:1)-(y.sev==='crit'?0:1)).map(a=>ch(a.ch));
+    list=[...new Set([...crit,curCh()])].slice(0,3);
+  }
+  return {list:list.slice(0,4),pps,explicit};
+}
+function chamberCtx(C){
+  const L=[],ML=C.lots.filter(l=>l.measured),W=ML.slice(-WIN),q=ppidOf(C,C.lots.length),act=S.alerts.filter(a=>a.ch===C.id&&a.status==='active');
+  L.push(`### ${C.label} (상태: ${SEVTXT[chSev(C)]}, 진행 중 PPID: ${q}, Cpk Thickness ${fmt(cpk(C,'thk'),2)} / XPS ${fmt(cpk(C,'xps'),2)})`);
+  L.push(`- 활성 알림: ${act.length?act.map(a=>`${ITEM[a.item]} ${a.type}(${a.msg}, ${mdhm(kTime(a.k0))})`).join(' | '):'없음'}`);
+  L.push(`- 기준 구간(최초 ${BASE_N} Lot) 계측 편차 μ/σ: Thickness ${sgn(C.base.thk.mu,3)}/${fmt(C.base.thk.sd,3)} Å, XPS ${sgn(C.base.xps.mu,4)}/${fmt(C.base.xps.sd,4)} at%`);
+  const l12=C.samples.slice(-12);
+  L.push('- 설비 Log 최근 12분 평균(Setpoint 대비 편차, 기준 대비 z): '+PK.map(p=>{const d=mean(l12.map(s=>s.d[p]))-C.base[p].mu;return `${PARAMS[p].label} ${sgn(d,PARAMS[p].dec)} ${PARAMS[p].unit}(z=${sgn(d/(C.base[p].sd/Math.sqrt(12)),1)})`;}).join(', '));
+  L.push(`- 온도·압력·유량·Lamp ↔ 계측 상관 — 편차 기준(PPID 효과 제거), 최근 ${W.length} 측정 Lot:`);
+  PK.forEach(p=>L.push(`  · ${PARAMS[p].label}: Thickness ${cfmt(corr(W,p,'thk',false))}; XPS ${cfmt(corr(W,p,'xps',false))}`));
+  L.push('- 절대값 기준 상관(PPID별 Setpoint 차이가 섞임): '+PK.map(p=>`${PARAMS[p].label}↔Thickness ${cfmt(corr(W,p,'thk',true))}`).join('; '));
+  L.push('- PPID별 (Lot 수 / 평균 Target 대비 Thickness·XPS / 온도↔Thickness 편차 상관):');
+  PP.forEach(pp=>{const lp=ML.filter(l=>l.q===pp&&l.i>=BASE_N);if(!lp.length){L.push(`  · ${pp}: 데이터 없음`);return;}
+    L.push(`  · ${pp}: ${lp.length} Lot, Thickness ${sgn(mean(lp.map(l=>l.md.thk)),2)} Å, XPS ${sgn(mean(lp.map(l=>l.md.xps)),3)} at%, 온도↔Thickness ${cfmt(corr(lp,'temp','thk',false))}`);});
+  L.push('- 최근 12 Lot (Lot, PPID, 설비 Lot평균 편차[온도/압력/유량/Lamp], 계측 Target 대비[Thk/XPS], 판정):');
+  C.lots.slice(-12).forEach(l=>L.push(`  · ${l.id} ${l.q} ${hhmm(l.t)} [${PK.map(p=>sgn(l.pd[p],PARAMS[p].dec)).join('/')}] `+(l.measured?`[${sgn(l.md.thk,2)}/${sgn(l.md.xps,3)}] Thk:${flagTxt(l.fl.thk)} XPS:${flagTxt(l.fl.xps)}`:'계측 대기')));
+  const pm=S.pm.filter(e=>e.ch===C.id).sort((a,b)=>b.lot-a.lot).slice(0,4);
+  if(pm.length)L.push('- PM/Shift 이력: '+pm.map(e=>`${mdhm(kTime(lotEndK(e.lot)))} ${e.title}(${e.detail})`).join(' | '));
+  return L.join('\n');
+}
+function buildContext(q){
+  const sc=scopeOf(q||''),L=[];
+  L.push('## 기준 정보');
+  L.push(`- 현재 시뮬레이션 시각 ${mdhm(kTime(nowK()))}. 데이터는 시뮬레이션(가상)입니다. 설비 Log는 1분 단위 연속 수집, 공정 계측은 Lot(Wafer 3매) 단위이며 공정 종료 후 ${MDELAY} Lot 뒤 도착합니다.`);
+  L.push('- 계층: 설비 4대(DIF-01~04) × 챔버 2개(CH-A/B) × PPID 3종. "1번 설비"=DIF-01. 모든 설비 값은 PPID Setpoint 대비 편차, 계측은 PPID Target 대비 편차로 감시합니다.');
+  L.push('- PPID 정의: '+PP.map(p=>`${p}(${PPIDS[p].desc}; Setpoint 온도 ${PPIDS[p].sp.temp}°C/압력 ${PPIDS[p].sp.press}mTorr/유량 ${PPIDS[p].sp.flow}slm/Lamp ${PPIDS[p].sp.lamp}kW; Target Thickness ${PPIDS[p].tgt.thk}Å/XPS ${PPIDS[p].tgt.xps}at%)`).join(' / '));
+  L.push(`- Spec: Thickness ±${METS.thk.tol}Å, XPS ±${METS.xps.tol}at%. FDC Spec(Setpoint 대비): `+PK.map(p=>`${PARAMS[p].label} ±${PARAMS[p].fdc}${PARAMS[p].unit}`).join(', '));
+  L.push(`- 화면 선택 상태: 챔버 ${curCh().label}, PPID 필터 ${S.ppf}, 계측 항목 ${ITEM[S.metSel]}`);
+  L.push('\n## 설비·챔버 개요');
+  S.chs.forEach(C=>L.push(`- ${C.label}: ${SEVTXT[chSev(C)]}, 진행 PPID ${ppidOf(C,C.lots.length)}, Cpk Thk ${fmt(cpk(C,'thk'),2)} / XPS ${fmt(cpk(C,'xps'),2)}, 활성 알림 ${S.alerts.filter(a=>a.ch===C.id&&a.status==='active').length}건`));
+  const act=S.alerts.filter(a=>a.status==='active').sort((x,y)=>(x.sev==='crit'?0:1)-(y.sev==='crit'?0:1)).slice(0,10);
+  L.push('\n## 활성 알림 및 자동 원인 후보');
+  if(!act.length)L.push('- 활성 알림 없음');
+  act.forEach(a=>{let t='';try{const an=analyze(a),c=an.cands[0];t=` → 원인 후보 1순위 ${PARAMS[c.p].label}(근거점수 ${fmt(c.score,2)}, r=${sgn(c.r,2)}, Shift z=${sgn(c.z,1)}, 변동 ${sgn(c.delta,PARAMS[c.p].dec)}${PARAMS[c.p].unit}), 예상 ${an.M.label} ${an.pred==null?'-':fmt(an.pred,an.M.dec)}${an.M.unit}, Spec 이탈 확률 ${an.pOut==null?'-':fmt(an.pOut*100,0)}%`;}catch(e){}
+    L.push(`- [${SEVTXT[a.sev]}] ${ch(a.ch).label} ${ITEM[a.item]} ${a.type}: ${a.msg} (${mdhm(kTime(a.k0))}, ${a.count}회)${t}`);});
+  L.push('\n## 연관관계 자동 추정 (챔버/설비 공통/PPID 요인)');
+  MK.forEach(m=>{const f=inferAll(m).finds;L.push(`- ${METS[m].label} 기준: `+(f.length?f.map(x=>`${x.type} — ${strip(x.text)}`).join(' / '):'뚜렷한 패턴 없음'));});
+  /* 질문 범위 상세 */
+  L.push(`\n## 상세 데이터 (${sc.explicit?'질문에서 지정한 범위':'질문에 설비 지정이 없어 위험 알림 챔버와 선택 챔버를 포함'})`);
+  const eqSet=[...new Set(sc.list.map(c=>c.eq))];
+  eqSet.forEach(e=>{
+    const cs=sc.list.filter(c=>c.eq===e);
+    if(cs.length>=2){
+      const W=cs.flatMap(c=>c.lots.filter(l=>l.measured&&l.i>=BASE_N).slice(-WIN));
+      L.push(`### ${e} 설비 전체(CH-A+CH-B 합산, ${W.length} Lot) 상관 — 편차 기준 / 절대값 기준`);
+      PK.forEach(p=>L.push(`  · ${PARAMS[p].label}↔Thickness 편차기준 ${cfmt(corr(W,p,'thk',false))}; 절대값기준 ${cfmt(corr(W,p,'thk',true))} | ↔XPS 편차기준 ${cfmt(corr(W,p,'xps',false))}`));
+    }
+  });
+  sc.list.forEach(C=>L.push(chamberCtx(C)));
+  if(sc.pps.length){L.push(`\n## 질문에 언급된 PPID(${sc.pps.join(', ')}) — 전 챔버 요약`);
+    sc.pps.forEach(pp=>S.chs.forEach(C=>{const s1=comboStat(C,pp,'thk'),s2=comboStat(C,pp,'xps');L.push(`- ${C.label} · ${pp}: `+(s1?`최근 ${s1.n} Lot Thickness ${sgn(s1.mu,2)}Å(z=${sgn(s1.z,1)}${s1.flag?', 이상':''}), XPS ${s2?sgn(s2.mu,3)+'at%(z='+sgn(s2.z,1)+')':'-'}`:'데이터 부족'));}));}
+  const mod=simModel();
+  L.push('\n## Recipe 회귀 모델 (전 챔버 '+mod.n+' Lot, 편차→계측 편차 다중 회귀)');
+  MK.forEach(m=>L.push(`- ${METS[m].label}: `+PK.map((p,i)=>`${PARAMS[p].label} ${sgn(mod.beta[m][i+1],m==='thk'?3:4)} ${METS[m].unit}/${PARAMS[p].unit}`).join(', ')+`, 잔차σ ${fmt(mod.rs[m],3)}`));
+  L.push(`- Lamp 1kW ≈ 온도 ${fmt(mod.couple,2)}°C 연동 (Lamp 계수가 ~0인 것은 온도 경유 효과 때문)`);
+  const ac=S.actions.slice(-8).reverse();
+  L.push('\n## 최근 조치 이력');
+  ac.forEach(a=>L.push(`- ${a.time} ${ch(a.ch).label} ${a.label} / ${a.action} / 영향 ${a.lots||0} Lot / ${a.verdict}`));
+  return L.join('\n');
+}
+const SYS_PROMPT=`당신은 Diffusion 공정·설비 모니터링 대시보드의 데이터 분석 어시스턴트입니다.
+규칙:
+1. 아래 [대시보드 데이터]에 있는 값만 근거로 한국어로 답하세요. 데이터에 없는 내용은 추측하지 말고 "대시보드 데이터로는 확인할 수 없습니다"라고 말하세요.
+2. 결론마다 근거 수치(상관계수 r, n, p값, 기울기, 편차, 시각, Cpk 등)를 함께 제시하세요. 상관은 인과가 아니므로 필요하면 한계를 한 줄로 짚으세요.
+3. 간결하게: 핵심 결론 1~2문장 → 근거 bullet(수치 포함) → 필요 시 권고 확인 항목.
+4. 편차 기준 상관은 PPID Setpoint/Target 차이를 제거한 값이고, 절대값 기준 상관은 PPID 간 차이가 섞여 있으므로 두 값이 다르면 그 이유를 설명하세요.
+5. 질문에서 "1번 설비"는 DIF-01(CH-A, CH-B)을 뜻합니다. 데이터는 시뮬레이션(가상)입니다.`;
+function fmtMd(t){
+  const out=[];let ul=false;
+  String(t).split('\n').forEach(line=>{
+    let s=esc(line).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
+    const mm=/^\s*[-*•]\s+(.*)$/.exec(s);
+    if(mm){if(!ul){out.push('<ul>');ul=true;}out.push('<li>'+mm[1]+'</li>');}
+    else{if(ul){out.push('</ul>');ul=false;}if(s.trim())out.push('<p>'+s.replace(/^#+\s*/,'<b>')+(/^#+\s*/.test(line)?'</b>':'')+'</p>');}
+  });
+  if(ul)out.push('</ul>');return out.join('');
+}
+function addMsg(cls,html){const el=document.createElement('div');el.className='msg '+cls;el.innerHTML=html;const log=$('#chatLog');log.appendChild(el);log.scrollTop=log.scrollHeight;return el;}
+async function callLLM(messages){
+  let url=CFG.base.trim().replace(/\/+$/,'');
+  if(!/\/chat\/completions$/.test(url))url+='/chat/completions';
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),120000);
+  try{
+    const res=await fetch(url,{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json','Authorization':'Bearer '+CFG.key},body:JSON.stringify({model:CFG.model.trim(),messages})});
+    const txt=await res.text();
+    if(!res.ok)throw new Error(`HTTP ${res.status} — ${txt.slice(0,300)}`);
+    const j=JSON.parse(txt),c=j.choices&&j.choices[0]&&j.choices[0].message&&j.choices[0].message.content;
+    if(!c)throw new Error('응답 형식을 해석할 수 없습니다: '+txt.slice(0,200));
+    return c;
+  }finally{clearTimeout(to);}
+}
+async function sendChat(text){
+  text=(text||'').trim();if(!text||CHAT.busy)return;
+  addMsg('u',esc(text));$('#chatIn').value='';
+  if(!CFG.base||!CFG.model||!CFG.key){addMsg('err','API 설정(base_url, model_name, api_key)을 먼저 입력해 주세요.');$('#cfg').open=true;return;}
+  CHAT.busy=true;$('#chatSend').disabled=true;
+  const ctx=buildContext(text);$('#chatCtx').textContent=ctx;
+  const wait=addMsg('a','<span class="sub">대시보드 데이터를 분석하는 중…</span>');
+  try{
+    const messages=[{role:'system',content:SYS_PROMPT+'\n\n[대시보드 데이터]\n'+ctx},...CHAT.msgs.slice(-8),{role:'user',content:text}];
+    const ans=await callLLM(messages);
+    CHAT.msgs.push({role:'user',content:text},{role:'assistant',content:ans});
+    wait.innerHTML=fmtMd(ans);
+  }catch(e){
+    wait.className='msg err';
+    const cors=(e instanceof TypeError)?'<br><span class="sub">네트워크/CORS 오류일 수 있습니다. 브라우저에서 직접 호출하므로 base_url 서버가 CORS를 허용해야 하고, URL이 맞는지 확인하세요.</span>':'';
+    wait.innerHTML='호출 실패: '+esc(e.name==='AbortError'?'시간 초과(120초)':e.message)+cors;
+  }finally{CHAT.busy=false;$('#chatSend').disabled=false;const log=$('#chatLog');log.scrollTop=log.scrollHeight;}
+}
+function initChat(){
+  try{CFG.base=localStorage.getItem('dm-base')||'';CFG.model=localStorage.getItem('dm-model')||'';}catch(_){}
+  const Q=['1번 설비는 공정 온도와 두께의 연관성이 어떻게 돼?','지금 가장 위험한 챔버와 원인 후보를 요약해줘','PPID별로 이상이 있는지 알려줘','DIF-03 CH-A는 온도가 1°C 오르면 두께가 얼마나 변해?'];
+  $('#chat').innerHTML=`<div class="card chatcard">
+    <div class="chhd"><h2>💬 데이터 챗봇</h2><button id="chatHide" aria-label="챗봇 접기">접기 ›</button></div>
+    <details class="cfg" id="cfg"><summary>⚙ API 설정 (OpenAI 호환)</summary>
+      <label>base_url<input id="cfgBase" placeholder="https://…/v1" autocomplete="off" spellcheck="false"></label>
+      <label>model_name<input id="cfgModel" placeholder="모델 이름" autocomplete="off" spellcheck="false"></label>
+      <label>api_key<input id="cfgKey" type="password" placeholder="입력한 서버로만 전송됩니다" autocomplete="off"></label>
+      <div class="sub" style="margin-top:6px">이 값들은 코드에 들어 있지 않습니다. api_key는 이 탭의 메모리에만 있고 저장되지 않으며(새로고침 시 삭제), base_url·model_name만 이 브라우저에 저장됩니다.</div>
+    </details>
+    <div class="chatlog" id="chatLog" aria-live="polite"></div>
+    <div class="chips" id="chatChips">${Q.map(q=>`<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    <div class="chatin"><textarea id="chatIn" rows="2" placeholder="대시보드 데이터에 대해 질문하세요 (Enter 전송, Shift+Enter 줄바꿈)"></textarea><button class="btn-primary" id="chatSend">전송</button></div>
+    <details><summary>챗봇에 전달되는 근거 데이터 보기</summary><pre id="chatCtx">질문을 보내면 이번 질문에 사용된 대시보드 데이터가 여기에 표시됩니다.</pre></details>
+  </div>`;
+  $('#cfgBase').value=CFG.base;$('#cfgModel').value=CFG.model;
+  $('#cfg').open=!(CFG.base&&CFG.model);
+  $('#cfgBase').addEventListener('input',e=>{CFG.base=e.target.value;try{localStorage.setItem('dm-base',CFG.base);}catch(_){}});
+  $('#cfgModel').addEventListener('input',e=>{CFG.model=e.target.value;try{localStorage.setItem('dm-model',CFG.model);}catch(_){}});
+  $('#cfgKey').addEventListener('input',e=>{CFG.key=e.target.value;});
+  $('#chatSend').addEventListener('click',()=>sendChat($('#chatIn').value));
+  $('#chatIn').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();sendChat($('#chatIn').value);}});
+  $('#chatChips').addEventListener('click',e=>{const b=e.target.closest('[data-q]');if(b)sendChat(b.dataset.q);});
+  $('#chatHide').addEventListener('click',()=>$('#layout').classList.add('nochat'));
+  $('#btnChat').addEventListener('click',()=>$('#layout').classList.toggle('nochat'));
+  addMsg('a',fmtMd('대시보드의 **현재 데이터**(설비·챔버·PPID, 설비 Log, 계측, 알림, 조치 이력)를 근거로 답합니다.\n- 먼저 위 **API 설정**에 base_url, model_name, api_key를 입력하세요.\n- 아래 예시 질문을 눌러 시작할 수 있습니다.'));
+}
+
+/* ====================== 구동 ====================== */
+function tick(){
+  if(!S.running)return;
+  S.tick++;
+  if(S.tick===40&&!ch('DIF-02/B').faults.length)injectFault('mfc',nowK()+1);     /* 자동 시연: 챔버 요인 */
+  if(S.tick===300&&!ch('DIF-04/A').faults.length)injectFault('hippid',nowK()+1); /* 자동 시연: PPID 요인 */
+  if(S.tick===900&&!ch('DIF-01/A').faults.length)injectFault('exhaust',nowK()+1);/* 자동 시연: 설비 공통 요인 */
+  S.chs.forEach(C=>step(C,true));
+  if((nowK()+1)%SPL===0)renderAll(false);
+  else if(!S.hover)renderFast();
+}
+function startTimer(){clearInterval(S.timer);S.timer=setInterval(tick,S.speed);}
+try{const th=localStorage.getItem('dm-theme');if(th)document.documentElement.dataset.theme=th;}catch(_){}
+for(let k=0;k<HIST_N*SPL;k++){
+  if(k===55*SPL)injectFault('heater',k);   /* DIF-03 CH-A Heater 열화: Lot 55부터 진행 중 */
+  S.chs.forEach(C=>step(C,false));
+}
+initSim();
+initChat();
+pickNext();
+renderAll(true);
+startTimer();
+window.__dash=S;
+})();
+</script>
+</body>
+</html>
